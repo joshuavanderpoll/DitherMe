@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog, colorchooser
-from PIL import Image, ImageTk, ImageEnhance, ImageFilter
+from PIL import Image, ImageTk, ImageEnhance, ImageFilter, ImageSequence
 
 
 class DitherMe:
@@ -16,7 +16,7 @@ class DitherMe:
         self.frame_right.pack(side=tk.RIGHT, padx=10, pady=10)
 
         # Upload Button
-        self.upload_btn = tk.Button(self.frame_right, text="Upload Image", command=self.upload_image)
+        self.upload_btn = tk.Button(self.frame_right, text="Upload Image/GIF", command=self.upload_image)
         self.upload_btn.pack(pady=10)
 
         # Dictionary to store sliders
@@ -40,12 +40,24 @@ class DitherMe:
         self.background_btn = tk.Button(self.frame_right, text="Select Background Color", command=self.pick_background)
         self.background_btn.pack(pady=5)
 
+        # Play/Stop Buttons for GIF
+        self.play_btn = tk.Button(self.frame_right, text="Play GIF", command=self.play_gif, state=tk.DISABLED)
+        self.play_btn.pack(pady=5)
+        self.stop_btn = tk.Button(self.frame_right, text="Stop GIF", command=self.stop_gif, state=tk.DISABLED)
+        self.stop_btn.pack(pady=5)
+
         # Canvas for the main image
         self.canvas_image = tk.Canvas(self.frame_left, width=300, height=300, bg="black")
         self.canvas_image.pack()
 
+        # Image attributes
         self.image = None
         self.processed_image = None
+        self.is_gif = False
+        self.gif_frames = []
+        self.processed_gif_frames = []
+        self.current_frame_index = 0
+        self.playing = False
 
     def add_slider(self, label, key, from_, to, default, command, resolution=1):
         """ Helper function to add sliders dynamically """
@@ -61,83 +73,108 @@ class DitherMe:
         color_code = colorchooser.askcolor(title="Choose Foreground Color")[0]
         if color_code:
             self.selected_foreground = tuple(int(c) for c in color_code)  # Store as RGB tuple
-            self.update_image()  # Update image after selection
+            self.update_image()
 
     def pick_background(self):
         """ Open color picker for dark (black) pixels """
         color_code = colorchooser.askcolor(title="Choose Background Color")[0]
         if color_code:
             self.selected_background = tuple(int(c) for c in color_code)  # Store as RGB tuple
-            self.update_image()  # Update image after selection
+            self.update_image()
 
     def upload_image(self):
         file_path = filedialog.askopenfilename()
 
         if file_path:
-            self.image = Image.open(file_path).convert("RGB")
-            self.processed_image = self.image.copy()
-            self.update_image()  # Apply settings immediately
+            self.image = Image.open(file_path)
+            self.is_gif = file_path.lower().endswith(".gif")
+
+            if self.is_gif:
+                self.gif_frames = [frame.convert("RGB") for frame in ImageSequence.Iterator(self.image)]
+                self.processed_gif_frames = self.gif_frames.copy()
+                self.play_btn.config(state=tk.NORMAL)
+                self.stop_btn.config(state=tk.NORMAL)
+            else:
+                self.image = self.image.convert("RGB")
+                self.processed_image = self.image.copy()
+                self.play_btn.config(state=tk.DISABLED)
+                self.stop_btn.config(state=tk.DISABLED)
+
+            self.update_image()
 
     def update_image(self, _=None):
-        if self.image:
-            # Apply scale
-            scale_factor = self.sliders["scale"].get() / 100
-            new_size = (int(self.image.width * scale_factor), int(self.image.height * scale_factor))
-            img = self.image.resize(new_size)
+        """ Update and apply effects to the image or GIF frames """
+        if self.is_gif:
+            self.processed_gif_frames = [self.process_frame(frame) for frame in self.gif_frames]
+            self.display_image(self.processed_gif_frames[0])
+        elif self.image:
+            self.processed_image = self.process_frame(self.image)
+            self.display_image(self.processed_image)
 
-            # Apply contrast
-            contrast_factor = self.sliders["contrast"].get()
-            img = ImageEnhance.Contrast(img).enhance(contrast_factor)
+    def process_frame(self, img):
+        """ Process a single frame or static image """
+        scale_factor = self.sliders["scale"].get() / 100
+        new_size = (int(img.width * scale_factor), int(img.height * scale_factor))
+        img = img.resize(new_size)
 
-            # Apply midtones (gamma correction)
-            midtones_factor = self.sliders["midtones"].get()
-            img = img.point(lambda p: (p / 255) ** (1 / midtones_factor) * 255)
+        contrast_factor = self.sliders["contrast"].get()
+        img = ImageEnhance.Contrast(img).enhance(contrast_factor)
 
-            # Apply highlights adjustment
-            highlights_factor = self.sliders["highlights"].get()
-            img = img.point(lambda p: min(255, p * highlights_factor))
+        midtones_factor = self.sliders["midtones"].get()
+        img = img.point(lambda p: (p / 255) ** (1 / midtones_factor) * 255)
 
-            # Apply blur
-            blur_amount = self.sliders["blur"].get()
-            if blur_amount > 0:
-                img = img.filter(ImageFilter.GaussianBlur(blur_amount))
+        highlights_factor = self.sliders["highlights"].get()
+        img = img.point(lambda p: min(255, p * highlights_factor))
 
-            # Apply pixelation effect
-            pixel_size = self.sliders["pixelation"].get()
-            if pixel_size > 1:
-                img = img.resize((img.width // pixel_size, img.height // pixel_size), Image.NEAREST)
-                img = img.resize((img.width * pixel_size, img.height * pixel_size), Image.NEAREST)
+        blur_amount = self.sliders["blur"].get()
+        if blur_amount > 0:
+            img = img.filter(ImageFilter.GaussianBlur(blur_amount))
 
-            # Apply dithering
-            self.apply_dithering(img)
+        pixel_size = self.sliders["pixelation"].get()
+        if pixel_size > 1:
+            img = img.resize((img.width // pixel_size, img.height // pixel_size), Image.NEAREST)
+            img = img.resize((img.width * pixel_size, img.height * pixel_size), Image.NEAREST)
+
+        return self.apply_dithering(img)
 
     def apply_dithering(self, img):
-        """ Convert to grayscale, apply dithering, and replace white & black pixels """
+        """ Apply dithering effect """
         gray_image = img.convert("L")
-
-        # Floyd-Steinberg dithering
         dithered_image = gray_image.convert("1", dither=Image.FLOYDSTEINBERG)
-
-        # Convert back to RGB
         dithered_rgb = dithered_image.convert("RGB")
 
-        # Replace white and black pixels with selected colors
         pixels = dithered_rgb.load()
         for y in range(dithered_rgb.height):
             for x in range(dithered_rgb.width):
-                if pixels[x, y] == (255, 255, 255):  # White pixels
-                    pixels[x, y] = self.selected_foreground  # Replace with chosen foreground color
-                elif pixels[x, y] == (0, 0, 0):  # Black pixels
-                    pixels[x, y] = self.selected_background  # Replace with chosen background color
+                if pixels[x, y] == (255, 255, 255):
+                    pixels[x, y] = self.selected_foreground
+                else:
+                    pixels[x, y] = self.selected_background
 
-        self.display_image(dithered_rgb)
+        return dithered_rgb
 
     def display_image(self, img):
         """ Display the image on the canvas """
-        img = img.resize((300, 300))  # Resize for display
+        img = img.resize((300, 300))
         img_tk = ImageTk.PhotoImage(img)
         self.canvas_image.create_image(150, 150, image=img_tk)
-        self.canvas_image.image = img_tk  # Keep reference
+        self.canvas_image.image = img_tk
+
+    def play_gif(self):
+        """ Play the GIF animation """
+        self.playing = True
+        self.animate()
+
+    def stop_gif(self):
+        """ Stop the GIF animation """
+        self.playing = False
+
+    def animate(self):
+        """ Loop through frames """
+        if self.playing and self.is_gif:
+            self.current_frame_index = (self.current_frame_index + 1) % len(self.processed_gif_frames)
+            self.display_image(self.processed_gif_frames[self.current_frame_index])
+            self.root.after(100, self.animate)
 
 
 if __name__ == "__main__":
