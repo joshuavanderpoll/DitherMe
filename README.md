@@ -1,4 +1,4 @@
-<h1 align="center">DitherMe - An .......</h1>
+<h1 align="center">DitherMe - Dither your images and GIFs</h1>
 
 <p align="center">
     <img src="https://api.visitorbadge.io/api/visitors?path=https%3A%2F%2Fgithub.com%2Fjoshuavanderpoll%2FDitherMe&label=Views&countColor=%2337d67a" />
