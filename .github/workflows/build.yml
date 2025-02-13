@@ -1,5 +1,8 @@
 name: Build DitherMe
 
+permissions:
+  contents: write
+
 on:
   push:
     branches:

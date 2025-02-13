@@ -1,10 +1,12 @@
+import os
+import sys
 import tkinter as tk
 from tkinter import filedialog, colorchooser
 from PIL import Image, ImageTk, ImageEnhance, ImageFilter, ImageSequence
 import numpy as np
 
 class DitherMe:
-    def __init__(self, root):
+    def __init__(self, root, startup_file=None):
         self.root = root
         self.root.title("DitherMe")
         self.root.geometry("700x700")
@@ -77,6 +79,10 @@ class DitherMe:
         self.current_frame_index = 0
         self.playing = False
 
+        if startup_file:
+            self.open_image(startup_file)
+
+
     def add_slider(self, label, key, from_, to, default, command, resolution=1):
         """ Helper function to add sliders dynamically """
         lbl = tk.Label(self.frame_right, text=label)
@@ -109,6 +115,19 @@ class DitherMe:
         self.selected_background = (0, 0, 0)  # Reset to black
 
         self.update_image()
+
+    def open_image(self, file_path):
+        """ Load and process the image """
+        if os.path.exists(file_path):
+            self.image = Image.open(file_path)
+            self.is_gif = file_path.lower().endswith(".gif")
+
+            if self.is_gif:
+                self.image = self.image.convert("RGB")
+            else:
+                self.image = self.image.convert("RGB")
+
+            self.display_image(self.image)
 
     def upload_image(self):
         file_path = filedialog.askopenfilename()
@@ -264,6 +283,11 @@ class DitherMe:
                 self.processed_image.save(file_path)
 
 if __name__ == "__main__":
+    startup_file = None
+
+    if len(sys.argv) > 1:
+        startup_file = sys.argv[1]
+
     root = tk.Tk()
-    app = DitherMe(root)
+    app = DitherMe(root, startup_file)
     root.mainloop()
