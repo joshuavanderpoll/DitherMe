@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import filedialog, colorchooser
 from PIL import Image, ImageTk, ImageEnhance, ImageFilter, ImageSequence
-
+import numpy as np
 
 class DitherMe:
     def __init__(self, root):
@@ -29,6 +29,7 @@ class DitherMe:
         self.add_slider("Highlights", "highlights", 0.5, 3.0, 1.0, self.update_image, 0.1)
         self.add_slider("Blur", "blur", 0, 10, 0, self.update_image, 0.1)
         self.add_slider("Pixelation", "pixelation", 1, 20, 1, self.update_image)
+        self.add_slider("Noise", "noise", 0, 100, 0, self.update_image)  # New Noise Slider
 
         # Color Picker Buttons
         self.selected_foreground = (255, 255, 255)  # Default white for bright pixels
@@ -135,7 +136,20 @@ class DitherMe:
             img = img.resize((img.width // pixel_size, img.height // pixel_size), Image.NEAREST)
             img = img.resize((img.width * pixel_size, img.height * pixel_size), Image.NEAREST)
 
+        img = self.apply_noise(img)  # Apply noise before dithering
         return self.apply_dithering(img)
+
+    def apply_noise(self, img):
+        """ Apply noise to the image """
+        noise_level = self.sliders["noise"].get()
+        if noise_level == 0:
+            return img  # No noise applied
+
+        np_img = np.array(img)
+        noise = np.random.randint(-noise_level, noise_level, np_img.shape, dtype=np.int16)
+        np_img = np.clip(np_img + noise, 0, 255).astype(np.uint8)
+
+        return Image.fromarray(np_img)
 
     def apply_dithering(self, img):
         """ Apply dithering effect """
