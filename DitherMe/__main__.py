@@ -79,6 +79,11 @@ class DitherMe:
         self.current_frame_index = 0
         self.playing = False
 
+        self.original_width = 200
+        self.original_height = 200
+        self.current_width = 200 
+        self.current_height = 200
+
         if startup_file:
             self.open_image(startup_file)
 
@@ -116,18 +121,31 @@ class DitherMe:
 
         self.update_image()
 
-    def open_image(self, file_path):
+    def open_image(self, file_path: str):
         """ Load and process the image """
         if os.path.exists(file_path):
             self.image = Image.open(file_path)
             self.is_gif = file_path.lower().endswith(".gif")
 
             if self.is_gif:
-                self.image = self.image.convert("RGB")
+                self.gif_durations = [frame.info.get("duration", 100) for frame in ImageSequence.Iterator(self.image)]
+                self.gif_frames = [frame.convert("RGB") for frame in ImageSequence.Iterator(self.image)]
+                self.processed_gif_frames = self.gif_frames.copy()
+                self.play_btn.config(state=tk.NORMAL)
+                self.stop_btn.config(state=tk.NORMAL)
             else:
                 self.image = self.image.convert("RGB")
+                self.processed_image = self.image.copy()
+                self.play_btn.config(state=tk.DISABLED)
+                self.stop_btn.config(state=tk.DISABLED)
 
-            self.display_image(self.image)
+            # Store original image size
+            self.original_width, self.original_height = self.image.size
+            self.current_width, self.current_height = self.original_width, self.original_height
+
+            # Update canvas to match the image aspect ratio
+            self.update_canvas_size()
+            self.update_image()
 
     def upload_image(self):
         file_path = filedialog.askopenfilename()
