@@ -64,13 +64,20 @@ jobs:
         with:
           name: DitherMe-Windows
           path: dist/windows/DitherMe.exe
+          
+      - name: Create DMG
+        if: matrix.os == 'macos-latest'
+        run: |
+          mkdir -p dist/dmg
+          hdiutil create -volname "DitherMe" -srcfolder dist/macos/DitherMe.app -ov -format UDZO dist/dmg/DitherMe.dmg
 
-      - name: Upload Artifact (macOS)
+      - name: Upload DMG Artifact
         if: matrix.os == 'macos-latest'
         uses: actions/upload-artifact@v4
         with:
           name: DitherMe-OSX
-          path: dist/macos/DitherMe.app
+          path: dist/dmg/DitherMe.dmg
+
 
   release:
     name: Create GitHub Release
@@ -93,7 +100,7 @@ jobs:
           name: DitherMe
           body: Automated build of DitherMe
           files: |
-            dist/DitherMe-OSX/DitherMe.app
+            dist/DitherMe-OSX/DitherMe.dmg
             dist/DitherMe-Windows/DitherMe.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
