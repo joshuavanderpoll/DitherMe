@@ -44,17 +44,33 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pyinstaller-
 
-      - name: Build Application
+      - name: Build Application (Windows)
+        if: matrix.os == 'windows-latest'
         run: |
-          pyinstaller --clean --windowed --onefile --name "DitherMe" --icon="assets/icon.${{ matrix.os == 'windows-latest' && 'ico' || 'icns' }}" DitherMe/__main__.py
-          mkdir -p dist/${{ matrix.os == 'windows-latest' && 'windows' || 'macos' }}
-          mv dist/DitherMe${{ matrix.os == 'windows-latest' && '.exe' || '' }} dist/${{ matrix.os == 'windows-latest' && 'windows' || 'macos' }}/DitherMe${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+          pyinstaller --clean --windowed --onefile --name "DitherMe" --icon="assets/icon.ico" DitherMe/__main__.py
+          mkdir -p dist/windows
+          mv dist/DitherMe.exe dist/windows/DitherMe.exe
 
-      - name: Upload Artifact
+      - name: Build Application (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          pyinstaller --clean --windowed --name "DitherMe" --icon="assets/icon.icns" --osx-bundle-identifier=nl.joshuavanderpoll.ditherme DitherMe/__main__.py
+          mkdir -p dist/macos
+          mv dist/DitherMe.app dist/macos/DitherMe.app
+
+      - name: Upload Artifact (Windows)
+        if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: DitherMe-${{ matrix.os == 'windows-latest' && 'Windows' || 'OSX' }}
-          path: dist/${{ matrix.os == 'windows-latest' && 'windows' || 'macos' }}
+          name: DitherMe-Windows
+          path: dist/windows/DitherMe.exe
+
+      - name: Upload Artifact (macOS)
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: DitherMe-OSX
+          path: dist/macos/DitherMe.app
 
   release:
     name: Create GitHub Release
@@ -77,7 +93,7 @@ jobs:
           name: DitherMe
           body: Automated build of DitherMe
           files: |
-            dist/DitherMe-OSX/DitherMe
+            dist/DitherMe-OSX/DitherMe.app
             dist/DitherMe-Windows/DitherMe.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

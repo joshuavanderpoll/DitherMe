@@ -1,4 +1,11 @@
 ## Build executable
+
+### OSX
 ```bash
-pyinstaller --name=DitherMe --clean --windowed --onefile --icon=icon.icns DitherMe/__main__.py
+pyinstaller --clean --windowed --name "DitherMe" --icon="assets/icon.icns" --osx-bundle-identifier=nl.joshuavanderpoll.ditherme DitherMe/__main__.py
+```
+
+### Windows
+```bash
+pyinstaller --clean --windowed --onefile --name "DitherMe" --icon="assets/icon.ico" DitherMe/__main__.py
 ```
