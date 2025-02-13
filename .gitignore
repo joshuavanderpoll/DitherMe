@@ -1,1 +1,7 @@
-.venv
+.venv/
+__pycache__
+dist/
+build/
+*.spec
+.DS_Store
+assets/icon.iconset/
