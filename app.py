@@ -7,6 +7,8 @@ class DitherMe:
     def __init__(self, root):
         self.root = root
         self.root.title("DitherMe")
+        self.root.geometry("700x700")
+        self.root.resizable(False, False)
 
         # Main Layout: Image Left, Sliders Right
         self.frame_left = tk.Frame(root)
@@ -21,15 +23,19 @@ class DitherMe:
 
         # Dictionary to store sliders
         self.sliders = {}
+        self.default_values = {
+            "scale": 100, "contrast": 1.0, "midtones": 1.0, "highlights": 1.0,
+            "blur": 0, "pixelation": 1, "noise": 0
+        }
 
         # Sliders
-        self.add_slider("Scale (%)", "scale", 10, 200, 100, self.update_image)
+        self.add_slider("Scale (%)", "scale", 1, 100, 100, self.update_image)
         self.add_slider("Contrast", "contrast", 0.5, 3.0, 1.0, self.update_image, 0.1)
         self.add_slider("Midtones", "midtones", 0.5, 3.0, 1.0, self.update_image, 0.1)
         self.add_slider("Highlights", "highlights", 0.5, 3.0, 1.0, self.update_image, 0.1)
         self.add_slider("Blur", "blur", 0, 10, 0, self.update_image, 0.1)
         self.add_slider("Pixelation", "pixelation", 1, 20, 1, self.update_image)
-        self.add_slider("Noise", "noise", 0, 100, 0, self.update_image)  # New Noise Slider
+        self.add_slider("Noise", "noise", 0, 100, 0, self.update_image)
 
         # Color Picker Buttons
         self.selected_foreground = (255, 255, 255)  # Default white for bright pixels
@@ -41,15 +47,22 @@ class DitherMe:
         self.background_btn = tk.Button(self.frame_right, text="Select Background Color", command=self.pick_background)
         self.background_btn.pack(pady=5)
 
-        # Play/Stop Buttons for GIF
-        self.play_btn = tk.Button(self.frame_right, text="Play GIF", command=self.play_gif, state=tk.DISABLED)
-        self.play_btn.pack(pady=5)
-        self.stop_btn = tk.Button(self.frame_right, text="Stop GIF", command=self.stop_gif, state=tk.DISABLED)
-        self.stop_btn.pack(pady=5)
+        # Reset Options Button
+        self.reset_btn = tk.Button(self.frame_right, text="Reset Options", command=self.reset_options)
+        self.reset_btn.pack(pady=10)
 
         # Canvas for the main image
         self.canvas_image = tk.Canvas(self.frame_left, width=300, height=300, bg="black")
         self.canvas_image.pack()
+
+        # Play/Stop Buttons Below Image
+        self.frame_bottom = tk.Frame(self.frame_left)
+        self.frame_bottom.pack(pady=10)
+
+        self.play_btn = tk.Button(self.frame_bottom, text="Play GIF", command=self.play_gif, state=tk.DISABLED)
+        self.play_btn.pack(side=tk.LEFT, padx=5)
+        self.stop_btn = tk.Button(self.frame_bottom, text="Stop GIF", command=self.stop_gif, state=tk.DISABLED)
+        self.stop_btn.pack(side=tk.LEFT, padx=5)
 
         # Image attributes
         self.image = None
@@ -82,6 +95,16 @@ class DitherMe:
         if color_code:
             self.selected_background = tuple(int(c) for c in color_code)  # Store as RGB tuple
             self.update_image()
+
+    def reset_options(self):
+        """ Reset all sliders and colors to their default values """
+        for key, value in self.default_values.items():
+            self.sliders[key].set(value)
+
+        self.selected_foreground = (255, 255, 255)  # Reset to white
+        self.selected_background = (0, 0, 0)  # Reset to black
+
+        self.update_image()
 
     def upload_image(self):
         file_path = filedialog.askopenfilename()
@@ -136,7 +159,7 @@ class DitherMe:
             img = img.resize((img.width // pixel_size, img.height // pixel_size), Image.NEAREST)
             img = img.resize((img.width * pixel_size, img.height * pixel_size), Image.NEAREST)
 
-        img = self.apply_noise(img)  # Apply noise before dithering
+        img = self.apply_noise(img)
         return self.apply_dithering(img)
 
     def apply_noise(self, img):
