@@ -71,10 +71,10 @@ python3 DitherMe
 ```
 
 ## 🖼 Previews
-<div style="display: flex; justify-content: space-between; gap: 10px;">
+<p align="center">
     <img src="assets/github/windows.jpg" alt="Windows Preview" width="45%">
     <img src="assets/github/osx.gif" alt="OSX Preview" width="45%">
-</div>
+</p>
 
 ## 💡 Contribute
 To contribute, first fork this repository, and `clone` it. Make your changes, whether you're fixing bugs, adding features, or improving translations. When done, `commit` your changes, `push` them, and submit a `pull request` for review to this repostiroy.
