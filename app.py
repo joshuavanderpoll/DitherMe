@@ -129,7 +129,32 @@ class DitherMe:
                 self.play_btn.config(state=tk.DISABLED)
                 self.stop_btn.config(state=tk.DISABLED)
 
+            # Store original image size
+            self.original_width, self.original_height = self.image.size
+            self.current_width, self.current_height = self.original_width, self.original_height
+
+            # Update canvas to match the image aspect ratio
+            self.update_canvas_size()
             self.update_image()
+            
+    def update_canvas_size(self):
+        """ Resize the canvas to match the image's aspect ratio within a max size. """
+        max_width, max_height = 500, 500  # Maximum size for preview window
+        aspect_ratio = self.original_width / self.original_height
+
+        if self.original_width > max_width or self.original_height > max_height:
+            if aspect_ratio > 1:
+                self.current_width = max_width
+                self.current_height = int(max_width / aspect_ratio)
+            else:
+                self.current_height = max_height
+                self.current_width = int(max_height * aspect_ratio)
+        else:
+            self.current_width, self.current_height = self.original_width, self.original_height
+
+        # Resize the canvas to fit the new dimensions
+        self.canvas_image.config(width=self.current_width, height=self.current_height)
+        self.canvas_image.pack()
 
     def update_image(self, _=None):
         """ Update and apply effects to the image or GIF frames """
@@ -138,6 +163,8 @@ class DitherMe:
             self.display_image(self.processed_gif_frames[0])
         elif self.image:
             self.processed_image = self.process_frame(self.image)
+
+            self.update_canvas_size()
             self.display_image(self.processed_image)
 
     def process_frame(self, img):
@@ -197,9 +224,9 @@ class DitherMe:
 
     def display_image(self, img):
         """ Display the image on the canvas """
-        img = img.resize((300, 300))
+        img = img.resize((self.current_width, self.current_height), Image.LANCZOS)
         img_tk = ImageTk.PhotoImage(img)
-        self.canvas_image.create_image(150, 150, image=img_tk)
+        self.canvas_image.create_image(self.current_width // 2, self.current_height // 2, image=img_tk)
         self.canvas_image.image = img_tk
 
     def play_gif(self):
