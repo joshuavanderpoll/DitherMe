@@ -64,6 +64,10 @@ class DitherMe:
         self.stop_btn = tk.Button(self.frame_bottom, text="Stop GIF", command=self.stop_gif, state=tk.DISABLED)
         self.stop_btn.pack(side=tk.LEFT, padx=5)
 
+        # Export Button
+        self.export_btn = tk.Button(self.frame_right, text="Export Image", command=self.export_image)
+        self.export_btn.pack(pady=10)
+
         # Image attributes
         self.image = None
         self.processed_image = None
@@ -114,6 +118,7 @@ class DitherMe:
             self.is_gif = file_path.lower().endswith(".gif")
 
             if self.is_gif:
+                self.gif_durations = [frame.info.get("duration", 100) for frame in ImageSequence.Iterator(self.image)]
                 self.gif_frames = [frame.convert("RGB") for frame in ImageSequence.Iterator(self.image)]
                 self.processed_gif_frames = self.gif_frames.copy()
                 self.play_btn.config(state=tk.NORMAL)
@@ -213,6 +218,23 @@ class DitherMe:
             self.display_image(self.processed_gif_frames[self.current_frame_index])
             self.root.after(100, self.animate)
 
+    def export_image(self):
+        """ Save the processed image or GIF """
+        if not self.processed_image and not self.processed_gif_frames:
+            return  # No image to save
+
+        filetypes = [("GIF files", "*.gif"), ("PNG files", "*.png"), ("JPEG files", "*.jpg")] if self.is_gif else [("PNG files", "*.png"), ("JPEG files", "*.jpg")]
+        file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=filetypes)
+
+        if file_path:
+            if self.is_gif:
+                # Save as animated GIF
+                self.processed_gif_frames[0].save(
+                    file_path, save_all=True, append_images=self.processed_gif_frames[1:], loop=0, duration=self.gif_durations
+                )
+            else:
+                # Save single processed image
+                self.processed_image.save(file_path)
 
 if __name__ == "__main__":
     root = tk.Tk()
