@@ -327,9 +327,35 @@ class DitherMe:
 
         if file_path:
             if self.is_gif:
-                # Save as animated GIF
-                self.processed_gif_frames[0].save(
-                    file_path, save_all=True, append_images=self.processed_gif_frames[1:], loop=0, duration=self.gif_durations
+                # Convert processed GIF frames to mode 'P' (palette-based) to preserve transparency
+                processed_frames = []
+
+                for frame in self.processed_gif_frames:
+                    frame = frame.convert("RGBA")  # Ensure RGBA mode for transparency
+                    alpha = frame.getchannel('A')  # Extract alpha channel
+
+                    # Convert to 'P' mode with transparency support
+                    frame = frame.convert("P", palette=Image.ADAPTIVE, colors=255)
+
+                    # Set transparency index
+                    transparency_index = 255  # Fully transparent pixel index
+                    frame.info['transparency'] = transparency_index
+
+                    # Apply transparency by setting fully transparent pixels to the transparency index
+                    frame.putpalette(frame.getpalette())  # Keep original palette
+                    frame.paste(transparency_index, mask=alpha)  # Use alpha as mask
+
+                    processed_frames.append(frame)
+
+                # Save animated GIF with correct transparency handling
+                processed_frames[0].save(
+                    file_path,
+                    save_all=True,
+                    append_images=processed_frames[1:],
+                    loop=0,
+                    duration=self.gif_durations,
+                    transparency=255,
+                    disposal=2
                 )
             else:
                 # Save single processed image
