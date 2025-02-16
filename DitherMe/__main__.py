@@ -65,9 +65,13 @@ class DitherMe:
         self.reset_btn = Button(self.frame_right, "Reset Options", command=self.reset_options)
         self.reset_btn.pack(pady=10, padx=10)
 
+        # Container for Image Preview
+        self.image_container = tk.Frame(self.frame_left, bg="#2A2B35", relief=tk.RIDGE) 
+        self.image_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
         # Canvas for main image
-        self.canvas_image = tk.Canvas(self.frame_left, width=500, height=500, bg="black", highlightthickness=0)
-        self.canvas_image.pack()
+        self.canvas_image = tk.Canvas(self.image_container, bg="black", highlightthickness=0)
+        self.canvas_image.pack(expand=True)
 
         # Play/Stop Buttons
         self.frame_bottom = tk.Frame(self.frame_left, bg="#1A1A23")
