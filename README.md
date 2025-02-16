@@ -19,6 +19,7 @@ DitherMe is a Python-based image effect generator inspired by the iconic glitchy
 ### 🎨 Features:
 - Dithering effects (Floyd-Steinberg algorithm)
 - Custom color palettes for dithering
+- Transparency support (PNG)
 - GIF support – Play & process animated images
 - Pixelation, contrast, blur, and noise filters
 - Interactive sliders for real-time adjustments
