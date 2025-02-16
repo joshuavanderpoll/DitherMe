@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import filedialog, colorchooser
 from PIL import Image, ImageTk, ImageColor, ImageEnhance, ImageFilter, ImageSequence, ImageDraw
 import numpy as np
+import mimetypes
 
 from ui.slider import Slider
 from ui.button import Button
@@ -144,8 +145,14 @@ class DitherMe:
             file_path = filedialog.askopenfilename()
 
         if file_path and os.path.exists(file_path):
+            mime_type, _ = mimetypes.guess_type(file_path)
+
+            if not mime_type.startswith("image/"):
+                tk.messagebox.showerror("Invalid File", "Please select a valid image file (PNG, JPG, GIF, WEBP, BMP, TIFF).")
+                return
+        
+            self.is_gif = mime_type == "image/gif"
             self.image = Image.open(file_path)
-            self.is_gif = file_path.lower().endswith(".gif")
 
             if self.is_gif:
                 self.gif_durations = [frame.info.get("duration", 100) for frame in ImageSequence.Iterator(self.image)]
