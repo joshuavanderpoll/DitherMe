@@ -150,16 +150,16 @@ class DitherMe:
             if not mime_type.startswith("image/"):
                 tk.messagebox.showerror("Invalid File", "Please select a valid image file (PNG, JPG, GIF, WEBP, BMP, TIFF).")
                 return
-        
+
             self.is_gif = mime_type == "image/gif"
             self.image = Image.open(file_path)
 
             if self.is_gif:
                 self.gif_durations = [frame.info.get("duration", 100) for frame in ImageSequence.Iterator(self.image)]
-                self.gif_frames = [frame.convert("RGB") for frame in ImageSequence.Iterator(self.image)]
+                self.gif_frames = [frame.convert("RGBA") for frame in ImageSequence.Iterator(self.image)]
                 self.processed_gif_frames = self.gif_frames.copy()
             else:
-                self.image = self.image.convert("RGB")
+                self.image = self.image.convert("RGBA")
                 self.processed_image = self.image.copy()
 
             self.original_width, self.original_height = self.image.size
@@ -201,69 +201,89 @@ class DitherMe:
             self.display_image(self.processed_image)
 
     def process_frame(self, img):
-        """ Process a frame with contrast, midtones, highlights, dithering, and color mapping, ensuring proper scaling. """
-        
+        """ Process an image frame."""
+
+        # Ensure image is in RGBA mode
+        img_rgba = img.convert("RGBA")
+        img_rgb, img_alpha = img_rgba.convert("RGB"), img_rgba.getchannel("A")
+
         # Get scale factor (percent-based)
         scale_factor = self.sliders["scale"].get_value() / 100.0
 
-        # Resize for processing (apply scale before dithering)
-        new_width = max(1, int(img.width * scale_factor))
-        new_height = max(1, int(img.height * scale_factor))
-        img = img.resize((new_width, new_height), Image.LANCZOS)
+        # Resize RGB and Alpha channels separately
+        new_size = (max(1, int(img.width * scale_factor)), max(1, int(img.height * scale_factor)))
+        img_rgb = img_rgb.resize(new_size, Image.LANCZOS)
+        img_alpha = img_alpha.resize(new_size, Image.LANCZOS)
 
-        # Convert to grayscale before dithering
-        img = img.convert("L")
+        # Convert to grayscale for dithering
+        img_gray = img_rgb.convert("L")
 
         # Apply contrast adjustment
         contrast_factor = self.sliders["contrast"].get_value()
-        img = ImageEnhance.Contrast(img).enhance(contrast_factor)
+        img_gray = ImageEnhance.Contrast(img_gray).enhance(contrast_factor)
 
         # Apply midtones and highlights correction
         midtone_factor = self.sliders["midtones"].get_value()
         highlight_factor = self.sliders["highlights"].get_value()
 
-        np_img = np.array(img, dtype=np.float32) / 255.0  # Normalize to [0,1]
+        np_img = np.array(img_gray, dtype=np.float32) / 255.0
         np_img = np_img ** (1 / midtone_factor)  # Adjust midtones
         np_img = np.clip(np_img * highlight_factor, 0, 1)  # Adjust highlights
-        img = Image.fromarray((np_img * 255).astype(np.uint8))
+        img_gray = Image.fromarray((np_img * 255).astype(np.uint8))
 
         # Apply blur
         blur_amount = self.sliders["blur"].get_value()
         if blur_amount > 0:
-            img = img.filter(ImageFilter.GaussianBlur(blur_amount))
+            img_gray = img_gray.filter(ImageFilter.GaussianBlur(blur_amount))
 
         # Apply pixelation
         pixelation_factor = self.sliders["pixelation"].get_value()
         if pixelation_factor > 1:
-            img = img.resize((img.width // pixelation_factor, img.height // pixelation_factor), Image.NEAREST)
-            img = img.resize((img.width * pixelation_factor, img.height * pixelation_factor), Image.NEAREST)
+            img_gray = img_gray.resize((img_gray.width // pixelation_factor, img_gray.height // pixelation_factor), Image.NEAREST)
+            img_gray = img_gray.resize((img_gray.width * pixelation_factor, img_gray.height * pixelation_factor), Image.NEAREST)
 
         # Apply noise
-        img = self.apply_noise(img)
+        img_gray = self.apply_noise(img_gray)
 
-        # **Apply Floyd-Steinberg Dithering**
-        dithered_img = img.convert("1", dither=Image.FLOYDSTEINBERG)
-
-        # Convert to RGBA for foreground/background coloring
+        # Apply dithering
+        dithered_img = img_gray.convert("1", dither=Image.FLOYDSTEINBERG)
         dithered_img = dithered_img.convert("RGBA")
-        pixels = dithered_img.load()
 
-        # Convert hex colors to RGBA tuples
-        fg_color = ImageColor.getrgb(self.selected_foreground) + (self.sliders["foreground_opacity"].get_value(),)
-        bg_color = ImageColor.getrgb(self.selected_background) + (self.sliders["background_opacity"].get_value(),)
+        # Get user-selected colors and opacity
+        fg_color = np.array(ImageColor.getrgb(self.selected_foreground), dtype=np.uint8)
+        bg_color = np.array(ImageColor.getrgb(self.selected_background), dtype=np.uint8)
+        
+        fg_opacity = self.sliders["foreground_opacity"].get_value() / 255.0  # Convert to range [0,1]
+        bg_opacity = self.sliders["background_opacity"].get_value() / 255.0  # Convert to range [0,1]
 
-        # Apply foreground and background colors with opacity
-        for y in range(dithered_img.height):
-            for x in range(dithered_img.width):
-                if pixels[x, y][:3] == (255, 255, 255):
-                    pixels[x, y] = fg_color
-                else:
-                    pixels[x, y] = bg_color
+        # Convert image to NumPy array
+        dithered_pixels = np.array(dithered_img, dtype=np.uint8)
+        alpha_pixels = np.array(img_alpha, dtype=np.uint8)
 
-        # **Scale back to original size after dithering**
-        dithered_img = dithered_img.resize((self.original_width, self.original_height), Image.NEAREST)
+        # Create a mask for dithering (white -> foreground, black -> background)
+        mask = (dithered_pixels[:, :, 0] > 128).astype(np.float32)  # White pixels (foreground)
 
-        return dithered_img
+        # Compute final blended color while preserving transparency
+        blended_pixels = np.zeros_like(dithered_pixels, dtype=np.uint8)
+
+        for i in range(3):  # Apply to R, G, B channels
+            blended_pixels[:, :, i] = (
+                mask * ((1 - fg_opacity) * dithered_pixels[:, :, i] + fg_opacity * fg_color[i]) +
+                (1 - mask) * ((1 - bg_opacity) * dithered_pixels[:, :, i] + bg_opacity * bg_color[i])
+            ).astype(np.uint8)
+
+        # **Apply alpha blending to transparency**
+        blended_pixels[:, :, 3] = (alpha_pixels * (
+            mask * fg_opacity + (1 - mask) * bg_opacity
+        )).astype(np.uint8)  # Preserve original transparency while respecting opacity
+
+        # Convert back to Image
+        final_image = Image.fromarray(blended_pixels, "RGBA")
+
+        # Resize back to original size
+        final_image = final_image.resize((self.original_width, self.original_height), Image.NEAREST)
+
+        return final_image
 
     def apply_noise(self, img):
         """ Apply noise to the image """
@@ -296,7 +316,7 @@ class DitherMe:
     def display_image(self, img):
         img = img.resize((self.current_width, self.current_height), Image.LANCZOS)
 
-        # Composite the image over the checkerboard
+        # Composite over checkerboard
         composite = Image.alpha_composite(self.checkerboard_bg.convert("RGBA"), img.convert("RGBA"))
 
         # Convert to Tkinter format and display
@@ -333,32 +353,14 @@ class DitherMe:
         if not self.processed_image and not self.processed_gif_frames:
             return  # No image to save
 
-        filetypes = [("GIF files", "*.gif"), ("PNG files", "*.png"), ("JPEG files", "*.jpg")] if self.is_gif else [("PNG files", "*.png"), ("JPEG files", "*.jpg")]
+        filetypes = [("PNG files", "*.png"), ("JPEG files", "*.jpg")] if not self.is_gif else [("GIF files", "*.gif"), ("PNG files", "*.png")]
         file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=filetypes)
 
         if file_path:
             if self.is_gif:
                 # Convert processed GIF frames to mode 'P' (palette-based) to preserve transparency
-                processed_frames = []
+                processed_frames = [frame.convert("RGBA") for frame in self.processed_gif_frames]
 
-                for frame in self.processed_gif_frames:
-                    frame = frame.convert("RGBA")  # Ensure RGBA mode for transparency
-                    alpha = frame.getchannel('A')  # Extract alpha channel
-
-                    # Convert to 'P' mode with transparency support
-                    frame = frame.convert("P", palette=Image.ADAPTIVE, colors=255)
-
-                    # Set transparency index
-                    transparency_index = 255  # Fully transparent pixel index
-                    frame.info['transparency'] = transparency_index
-
-                    # Apply transparency by setting fully transparent pixels to the transparency index
-                    frame.putpalette(frame.getpalette())  # Keep original palette
-                    frame.paste(transparency_index, mask=alpha)  # Use alpha as mask
-
-                    processed_frames.append(frame)
-
-                # Save animated GIF with correct transparency handling
                 processed_frames[0].save(
                     file_path,
                     save_all=True,
@@ -369,8 +371,8 @@ class DitherMe:
                     disposal=2
                 )
             else:
-                # Save single processed image
-                self.processed_image.save(file_path)
+                # Save single processed image with transparency
+                self.processed_image.save(file_path, format="PNG")
 
 if __name__ == "__main__":
     startup_file = None
