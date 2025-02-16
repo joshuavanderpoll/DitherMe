@@ -117,7 +117,9 @@ class Slider(tk.Canvas):
             value = float(self.value_entry.get())
             value = round(value / self.resolution) * self.resolution
             if self.min_val <= value <= self.max_val:
-                self.set_value(value)
+                self.set_value(value)  # Update slider value
+                if self.command:
+                    self.command(value)  # Ensure the command function is called
         except ValueError:
             pass  # Ignore invalid input
 
