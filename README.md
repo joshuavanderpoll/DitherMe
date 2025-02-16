@@ -72,8 +72,7 @@ python3 DitherMe
 
 ## 🖼 Previews
 <p align="center">
-    <img src="assets/github/windows.jpg" alt="Windows Preview" width="45%">
-    <img src="assets/github/osx.gif" alt="OSX Preview" width="45%">
+    <img src="assets/github/preview.png" alt="Preview">
 </p>
 
 ## 💡 Contribute
