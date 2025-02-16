@@ -2,7 +2,7 @@ import os
 import sys
 import tkinter as tk
 from tkinter import filedialog, colorchooser
-from PIL import Image, ImageTk, ImageColor, ImageEnhance, ImageFilter, ImageSequence
+from PIL import Image, ImageTk, ImageColor, ImageEnhance, ImageFilter, ImageSequence, ImageDraw
 import numpy as np
 
 from ui.slider import Slider
@@ -55,7 +55,6 @@ class DitherMe:
         self.foreground_btn.pack(pady=5, padx=10)
         self.add_slider("Foreground Opacity", "foreground_opacity", 0, 255, 255, self.update_image)
 
-
         # Background color picker
         self.background_btn = Button(self.frame_right, "Select Background Color", command=self.pick_background, color_preview=True)
         self.background_btn.update_preview_color(self.selected_background)
@@ -97,6 +96,8 @@ class DitherMe:
         self.original_height = 200
         self.current_width = 200
         self.current_height = 200
+
+        self.update_canvas_size()
 
         if startup_file:
             self.open_image(startup_file)
@@ -155,8 +156,7 @@ class DitherMe:
             self.update_image()
             
     def update_canvas_size(self):
-        """ Resize the canvas to match the image's aspect ratio within a max size. """
-        max_width, max_height = 500, 500  # Maximum size for preview window
+        max_width, max_height = 500, 500
         aspect_ratio = self.original_width / self.original_height
 
         if self.original_width > max_width or self.original_height > max_height:
@@ -169,9 +169,17 @@ class DitherMe:
         else:
             self.current_width, self.current_height = self.original_width, self.original_height
 
-        # Resize the canvas to fit the new dimensions
+        # Generate checkerboard background
+        self.checkerboard_bg = self.create_checkerboard(self.current_width, self.current_height)
+        self.checkerboard_bg_tk = ImageTk.PhotoImage(self.checkerboard_bg)
+
+        # Resize canvas to fit image
         self.canvas_image.config(width=self.current_width, height=self.current_height)
         self.canvas_image.pack()
+
+        # Display checkerboard as background
+        self.canvas_image.create_image(0, 0, anchor=tk.NW, image=self.checkerboard_bg_tk)
+
 
     def update_image(self):
         if self.is_gif:
@@ -276,9 +284,25 @@ class DitherMe:
 
     def display_image(self, img):
         img = img.resize((self.current_width, self.current_height), Image.LANCZOS)
-        img_tk = ImageTk.PhotoImage(img)
+
+        # Composite the image over the checkerboard
+        composite = Image.alpha_composite(self.checkerboard_bg.convert("RGBA"), img.convert("RGBA"))
+
+        # Convert to Tkinter format and display
+        img_tk = ImageTk.PhotoImage(composite)
         self.canvas_image.create_image(self.current_width // 2, self.current_height // 2, image=img_tk)
         self.canvas_image.image = img_tk
+
+    def create_checkerboard(self, width, height, box_size=10):
+        pattern = Image.new("RGB", (width, height), "#BFBFBF")  # Light gray base
+
+        draw = ImageDraw.Draw(pattern)
+        for y in range(0, height, box_size * 2):
+            for x in range(0, width, box_size * 2):
+                draw.rectangle([x, y, x + box_size, y + box_size], fill="#E0E0E0")  # Lighter box
+                draw.rectangle([x + box_size, y + box_size, x + box_size * 2, y + box_size * 2], fill="#E0E0E0")  
+
+        return pattern
 
     def play_gif(self):
         """ Play the GIF animation """
