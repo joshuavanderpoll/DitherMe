@@ -2,26 +2,32 @@ import os
 import sys
 import tkinter as tk
 from tkinter import filedialog, colorchooser
-from PIL import Image, ImageTk, ImageEnhance, ImageFilter, ImageSequence
+from PIL import Image, ImageTk, ImageColor, ImageEnhance, ImageFilter, ImageSequence
 import numpy as np
+
+from ui.slider import Slider
+from ui.button import Button
 
 class DitherMe:
     def __init__(self, root, startup_file=None):
         self.root = root
         self.root.title("DitherMe")
-        self.root.geometry("700x700")
+        self.root.geometry("1110x750")
         self.root.resizable(False, False)
+        self.root.configure(bg="#1A1A23")
 
-        # Main Layout: Image Left, Sliders Right
-        self.frame_left = tk.Frame(root)
-        self.frame_left.pack(side=tk.LEFT, padx=10, pady=10)
+        # Sidebar
+        self.frame_right = tk.Frame(root, width=300, bg="#2A2B35")
+        self.frame_right.pack(side=tk.RIGHT, fill=tk.Y)
+        self.frame_right.pack_propagate(False)
 
-        self.frame_right = tk.Frame(root)
-        self.frame_right.pack(side=tk.RIGHT, padx=10, pady=10)
+        # Main content
+        self.frame_left = tk.Frame(root, bg="#1A1A23")
+        self.frame_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Upload Button
-        self.upload_btn = tk.Button(self.frame_right, text="Upload Image/GIF", command=self.upload_image)
-        self.upload_btn.pack(pady=10)
+        self.upload_btn = Button(self.frame_right, "Upload Image/GIF", command=self.upload_image)
+        self.upload_btn.pack(pady=10, padx=10)
 
         # Dictionary to store sliders
         self.sliders = {}
@@ -31,7 +37,7 @@ class DitherMe:
         }
 
         # Sliders
-        self.add_slider("Scale (%)", "scale", 1, 100, 100, self.update_image)
+        self.add_slider("Scale", "scale", 1, 100, 100, self.update_image, True)
         self.add_slider("Contrast", "contrast", 0.5, 3.0, 1.0, self.update_image, 0.1)
         self.add_slider("Midtones", "midtones", 0.5, 3.0, 1.0, self.update_image, 0.1)
         self.add_slider("Highlights", "highlights", 0.5, 3.0, 1.0, self.update_image, 0.1)
@@ -39,36 +45,41 @@ class DitherMe:
         self.add_slider("Pixelation", "pixelation", 1, 20, 1, self.update_image)
         self.add_slider("Noise", "noise", 0, 100, 0, self.update_image)
 
-        # Color Picker Buttons
-        self.selected_foreground = (255, 255, 255)  # Default white for bright pixels
-        self.selected_background = (0, 0, 0)  # Default black for dark pixels
+        # Foreground and Background color initialization
+        self.selected_foreground = "#FFFFFF"  # Default to white
+        self.selected_background = "#000000"  # Default to black
 
-        self.foreground_btn = tk.Button(self.frame_right, text="Select Foreground Color", command=self.pick_foreground)
-        self.foreground_btn.pack(pady=5)
+        # Foreground color picker
+        self.foreground_btn = Button(self.frame_right, "Select Foreground Color", command=self.pick_foreground, color_preview=True)
+        self.foreground_btn.update_preview_color(self.selected_foreground)
+        self.foreground_btn.pack(pady=5, padx=10)
 
-        self.background_btn = tk.Button(self.frame_right, text="Select Background Color", command=self.pick_background)
-        self.background_btn.pack(pady=5)
+        # Background color picker
+        self.background_btn = Button(self.frame_right, "Select Background Color", command=self.pick_background, color_preview=True)
+        self.background_btn.update_preview_color(self.selected_background)
+        self.background_btn.pack(pady=5, padx=10)
 
         # Reset Options Button
-        self.reset_btn = tk.Button(self.frame_right, text="Reset Options", command=self.reset_options)
-        self.reset_btn.pack(pady=10)
+        self.reset_btn = Button(self.frame_right, "Reset Options", command=self.reset_options)
+        self.reset_btn.pack(pady=10, padx=10)
 
-        # Canvas for the main image
-        self.canvas_image = tk.Canvas(self.frame_left, width=300, height=300, bg="black")
+        # Canvas for main image
+        self.canvas_image = tk.Canvas(self.frame_left, width=500, height=500, bg="black", highlightthickness=0)
         self.canvas_image.pack()
 
-        # Play/Stop Buttons Below Image
-        self.frame_bottom = tk.Frame(self.frame_left)
+        # Play/Stop Buttons
+        self.frame_bottom = tk.Frame(self.frame_left, bg="#1A1A23")
         self.frame_bottom.pack(pady=10)
 
-        self.play_btn = tk.Button(self.frame_bottom, text="Play GIF", command=self.play_gif, state=tk.DISABLED)
+        self.play_btn = Button(self.frame_bottom, "Play GIF", command=self.play_gif)
         self.play_btn.pack(side=tk.LEFT, padx=5)
-        self.stop_btn = tk.Button(self.frame_bottom, text="Stop GIF", command=self.stop_gif, state=tk.DISABLED)
+
+        self.stop_btn = Button(self.frame_bottom, "Stop GIF", command=self.stop_gif)
         self.stop_btn.pack(side=tk.LEFT, padx=5)
 
         # Export Button
-        self.export_btn = tk.Button(self.frame_right, text="Export Image", command=self.export_image)
-        self.export_btn.pack(pady=10)
+        self.export_btn = Button(self.frame_right, "Export Image", command=self.export_image)
+        self.export_btn.pack(pady=10, padx=10)
 
         # Image attributes
         self.image = None
@@ -81,49 +92,50 @@ class DitherMe:
 
         self.original_width = 200
         self.original_height = 200
-        self.current_width = 200 
+        self.current_width = 200
         self.current_height = 200
 
         if startup_file:
             self.open_image(startup_file)
 
-
     def add_slider(self, label, key, from_, to, default, command, resolution=1):
-        """ Helper function to add sliders dynamically """
-        lbl = tk.Label(self.frame_right, text=label)
-        lbl.pack()
-        slider = tk.Scale(self.frame_right, from_=from_, to=to, resolution=resolution, orient=tk.HORIZONTAL, command=command)
-        slider.set(default)
-        slider.pack()
-        self.sliders[key] = slider  # Store slider in dictionary
+        slider = Slider(self.frame_right, label, min_val=from_, max_val=to, default_val=default, command=lambda v: command(), resolution=resolution)
+        self.sliders[key] = slider
 
     def pick_foreground(self):
-        """ Open color picker for bright (white) pixels """
-        color_code = colorchooser.askcolor(title="Choose Foreground Color")[0]
+        color_code = colorchooser.askcolor(title="Choose Foreground Color")[1]
         if color_code:
-            self.selected_foreground = tuple(int(c) for c in color_code)  # Store as RGB tuple
+            self.selected_foreground = color_code
+            self.foreground_btn.update_preview_color(color_code)
             self.update_image()
 
     def pick_background(self):
-        """ Open color picker for dark (black) pixels """
-        color_code = colorchooser.askcolor(title="Choose Background Color")[0]
+        color_code = colorchooser.askcolor(title="Choose Background Color")[1]
         if color_code:
-            self.selected_background = tuple(int(c) for c in color_code)  # Store as RGB tuple
+            self.selected_background = color_code
+            self.background_btn.update_preview_color(color_code)
             self.update_image()
 
     def reset_options(self):
-        """ Reset all sliders and colors to their default values """
         for key, value in self.default_values.items():
-            self.sliders[key].set(value)
+            self.sliders[key].set_value(value)
 
-        self.selected_foreground = (255, 255, 255)  # Reset to white
-        self.selected_background = (0, 0, 0)  # Reset to black
+        self.selected_foreground = "#FFFFFF"
+        self.selected_background = "#000000"
+        self.foreground_btn.update_preview_color(self.selected_foreground)
+        self.background_btn.update_preview_color(self.selected_background)
 
         self.update_image()
 
     def open_image(self, file_path: str):
-        """ Load and process the image """
         if os.path.exists(file_path):
+            self.upload_image(file_path)
+
+    def upload_image(self, file_path=None):
+        if not file_path:
+            file_path = filedialog.askopenfilename()
+
+        if file_path and os.path.exists(file_path):
             self.image = Image.open(file_path)
             self.is_gif = file_path.lower().endswith(".gif")
 
@@ -131,46 +143,11 @@ class DitherMe:
                 self.gif_durations = [frame.info.get("duration", 100) for frame in ImageSequence.Iterator(self.image)]
                 self.gif_frames = [frame.convert("RGB") for frame in ImageSequence.Iterator(self.image)]
                 self.processed_gif_frames = self.gif_frames.copy()
-                self.play_btn.config(state=tk.NORMAL)
-                self.stop_btn.config(state=tk.NORMAL)
             else:
                 self.image = self.image.convert("RGB")
                 self.processed_image = self.image.copy()
-                self.play_btn.config(state=tk.DISABLED)
-                self.stop_btn.config(state=tk.DISABLED)
 
-            # Store original image size
             self.original_width, self.original_height = self.image.size
-            self.current_width, self.current_height = self.original_width, self.original_height
-
-            # Update canvas to match the image aspect ratio
-            self.update_canvas_size()
-            self.update_image()
-
-    def upload_image(self):
-        file_path = filedialog.askopenfilename()
-
-        if file_path:
-            self.image = Image.open(file_path)
-            self.is_gif = file_path.lower().endswith(".gif")
-
-            if self.is_gif:
-                self.gif_durations = [frame.info.get("duration", 100) for frame in ImageSequence.Iterator(self.image)]
-                self.gif_frames = [frame.convert("RGB") for frame in ImageSequence.Iterator(self.image)]
-                self.processed_gif_frames = self.gif_frames.copy()
-                self.play_btn.config(state=tk.NORMAL)
-                self.stop_btn.config(state=tk.NORMAL)
-            else:
-                self.image = self.image.convert("RGB")
-                self.processed_image = self.image.copy()
-                self.play_btn.config(state=tk.DISABLED)
-                self.stop_btn.config(state=tk.DISABLED)
-
-            # Store original image size
-            self.original_width, self.original_height = self.image.size
-            self.current_width, self.current_height = self.original_width, self.original_height
-
-            # Update canvas to match the image aspect ratio
             self.update_canvas_size()
             self.update_image()
             
@@ -193,47 +170,79 @@ class DitherMe:
         self.canvas_image.config(width=self.current_width, height=self.current_height)
         self.canvas_image.pack()
 
-    def update_image(self, _=None):
-        """ Update and apply effects to the image or GIF frames """
+    def update_image(self):
         if self.is_gif:
             self.processed_gif_frames = [self.process_frame(frame) for frame in self.gif_frames]
             self.display_image(self.processed_gif_frames[0])
         elif self.image:
             self.processed_image = self.process_frame(self.image)
-
-            self.update_canvas_size()
             self.display_image(self.processed_image)
 
     def process_frame(self, img):
-        """ Process a single frame or static image """
-        scale_factor = self.sliders["scale"].get() / 100
-        new_size = (int(img.width * scale_factor), int(img.height * scale_factor))
-        img = img.resize(new_size)
+        """ Process a frame with contrast, midtones, highlights, dithering, and color mapping, ensuring proper scaling. """
+        
+        # Get scale factor (percent-based)
+        scale_factor = self.sliders["scale"].get_value() / 100.0
 
-        contrast_factor = self.sliders["contrast"].get()
+        # Resize for processing (apply scale before dithering)
+        new_width = max(1, int(img.width * scale_factor))
+        new_height = max(1, int(img.height * scale_factor))
+        img = img.resize((new_width, new_height), Image.LANCZOS)
+
+        # Convert to grayscale before dithering
+        img = img.convert("L")
+
+        # Apply contrast adjustment
+        contrast_factor = self.sliders["contrast"].get_value()
         img = ImageEnhance.Contrast(img).enhance(contrast_factor)
 
-        midtones_factor = self.sliders["midtones"].get()
-        img = img.point(lambda p: (p / 255) ** (1 / midtones_factor) * 255)
+        # Apply midtones and highlights correction
+        midtone_factor = self.sliders["midtones"].get_value()
+        highlight_factor = self.sliders["highlights"].get_value()
 
-        highlights_factor = self.sliders["highlights"].get()
-        img = img.point(lambda p: min(255, p * highlights_factor))
+        np_img = np.array(img, dtype=np.float32) / 255.0  # Normalize to [0,1]
+        np_img = np_img ** (1 / midtone_factor)  # Adjust midtones
+        np_img = np.clip(np_img * highlight_factor, 0, 1)  # Adjust highlights
+        img = Image.fromarray((np_img * 255).astype(np.uint8))
 
-        blur_amount = self.sliders["blur"].get()
+        # Apply blur
+        blur_amount = self.sliders["blur"].get_value()
         if blur_amount > 0:
             img = img.filter(ImageFilter.GaussianBlur(blur_amount))
 
-        pixel_size = self.sliders["pixelation"].get()
-        if pixel_size > 1:
-            img = img.resize((img.width // pixel_size, img.height // pixel_size), Image.NEAREST)
-            img = img.resize((img.width * pixel_size, img.height * pixel_size), Image.NEAREST)
+        # Apply pixelation
+        pixelation_factor = self.sliders["pixelation"].get_value()
+        if pixelation_factor > 1:
+            img = img.resize((img.width // pixelation_factor, img.height // pixelation_factor), Image.NEAREST)
+            img = img.resize((img.width * pixelation_factor, img.height * pixelation_factor), Image.NEAREST)
 
+        # Apply noise
         img = self.apply_noise(img)
-        return self.apply_dithering(img)
+
+        # **Apply Floyd-Steinberg Dithering**
+        dithered_img = img.convert("1", dither=Image.FLOYDSTEINBERG)
+
+        # Convert to RGB for foreground/background coloring
+        dithered_img = dithered_img.convert("RGB")
+        pixels = dithered_img.load()
+
+        # Convert hex colors to RGB tuples
+        fg_color = ImageColor.getrgb(self.selected_foreground)
+        bg_color = ImageColor.getrgb(self.selected_background)
+
+        # Apply foreground and background colors
+        for y in range(dithered_img.height):
+            for x in range(dithered_img.width):
+                pixels[x, y] = fg_color if pixels[x, y] == (255, 255, 255) else bg_color
+
+        # **Scale back to original size after dithering**
+        dithered_img = dithered_img.resize((self.original_width, self.original_height), Image.NEAREST)
+
+        return dithered_img
 
     def apply_noise(self, img):
         """ Apply noise to the image """
-        noise_level = self.sliders["noise"].get()
+        noise_level = self.sliders["noise"].get_value()
         if noise_level == 0:
             return img  # No noise applied
 
@@ -260,7 +269,6 @@ class DitherMe:
         return dithered_rgb
 
     def display_image(self, img):
-        """ Display the image on the canvas """
         img = img.resize((self.current_width, self.current_height), Image.LANCZOS)
         img_tk = ImageTk.PhotoImage(img)
         self.canvas_image.create_image(self.current_width // 2, self.current_height // 2, image=img_tk)
@@ -272,18 +280,15 @@ class DitherMe:
         self.animate()
 
     def stop_gif(self):
-        """ Stop the GIF animation """
         self.playing = False
 
     def animate(self):
-        """ Loop through frames """
         if self.playing and self.is_gif:
             self.current_frame_index = (self.current_frame_index + 1) % len(self.processed_gif_frames)
             self.display_image(self.processed_gif_frames[self.current_frame_index])
             self.root.after(100, self.animate)
 
     def export_image(self):
-        """ Save the processed image or GIF """
         if not self.processed_image and not self.processed_gif_frames:
             return  # No image to save
 
