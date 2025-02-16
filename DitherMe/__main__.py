@@ -53,11 +53,14 @@ class DitherMe:
         self.foreground_btn = Button(self.frame_right, "Select Foreground Color", command=self.pick_foreground, color_preview=True)
         self.foreground_btn.update_preview_color(self.selected_foreground)
         self.foreground_btn.pack(pady=5, padx=10)
+        self.add_slider("Foreground Opacity", "foreground_opacity", 0, 255, 255, self.update_image)
+
 
         # Background color picker
         self.background_btn = Button(self.frame_right, "Select Background Color", command=self.pick_background, color_preview=True)
         self.background_btn.update_preview_color(self.selected_background)
         self.background_btn.pack(pady=5, padx=10)
+        self.add_slider("Background Opacity", "background_opacity", 0, 255, 255, self.update_image)
 
         # Reset Options Button
         self.reset_btn = Button(self.frame_right, "Reset Options", command=self.reset_options)
@@ -222,18 +225,21 @@ class DitherMe:
         # **Apply Floyd-Steinberg Dithering**
         dithered_img = img.convert("1", dither=Image.FLOYDSTEINBERG)
 
-        # Convert to RGB for foreground/background coloring
-        dithered_img = dithered_img.convert("RGB")
+        # Convert to RGBA for foreground/background coloring
+        dithered_img = dithered_img.convert("RGBA")
         pixels = dithered_img.load()
 
-        # Convert hex colors to RGB tuples
-        fg_color = ImageColor.getrgb(self.selected_foreground)
-        bg_color = ImageColor.getrgb(self.selected_background)
+        # Convert hex colors to RGBA tuples
+        fg_color = ImageColor.getrgb(self.selected_foreground) + (self.sliders["foreground_opacity"].get_value(),)
+        bg_color = ImageColor.getrgb(self.selected_background) + (self.sliders["background_opacity"].get_value(),)
 
-        # Apply foreground and background colors
+        # Apply foreground and background colors with opacity
         for y in range(dithered_img.height):
             for x in range(dithered_img.width):
-                pixels[x, y] = fg_color if pixels[x, y] == (255, 255, 255) else bg_color
+                if pixels[x, y][:3] == (255, 255, 255):
+                    pixels[x, y] = fg_color
+                else:
+                    pixels[x, y] = bg_color
 
         # **Scale back to original size after dithering**
         dithered_img = dithered_img.resize((self.original_width, self.original_height), Image.NEAREST)
