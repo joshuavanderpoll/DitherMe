@@ -34,6 +34,9 @@ class Slider(tk.Canvas):
         self.value_label = tk.Label(self.slider_row, text=str(round(default_val, 1)), bg="#2A2B35", fg="white", width=4)
         self.value_label.pack(side=tk.RIGHT, padx=(5, 0), pady=(5.5, 0))
 
+        # Bind event to allow user input
+        self.value_label.bind("<Button-1>", self.enable_text_input)
+
         # Create slider components
         self.track = self.create_rectangle(10, 20, self.slider_width - 10, 20 + self.slider_height, fill="#D3D3D3", outline="")
         self.progress = self.create_rectangle(10, 20, 10, 20 + self.slider_height, fill="#006CE8", outline="")
@@ -79,6 +82,9 @@ class Slider(tk.Canvas):
         # Update knob position
         self.coords(self.knob, knob_x - self.dot_radius, 16, knob_x + self.dot_radius, 16 + self.dot_radius * 2)
 
+        # Update the displayed value
+        self.value_label.config(text=str(round(self.current_value, 1)))
+
     def get_value(self):
         """ Return the current value of the slider """
         return self.current_value
@@ -87,4 +93,34 @@ class Slider(tk.Canvas):
         """ Set the slider value programmatically """
         self.current_value = max(self.min_val, min(value, self.max_val))
         self.update_slider_position()
-        self.value_label.config(text=str(self.current_value))  # Update the displayed value
+        self.value_label.config(text=str(round(self.current_value, 1)))  # Update the displayed value
+
+    def enable_text_input(self, event):
+        """ Replace the label with an entry field for manual input """
+        self.value_entry = tk.Entry(self.slider_row, width=4, bg="#2A2B35", fg="white", insertbackground="white")
+        self.value_entry.insert(0, str(self.current_value))
+        self.value_entry.pack(side=tk.RIGHT, padx=(5, 0), pady=(5.5, 0))
+
+        # Remove label
+        self.value_label.pack_forget()
+
+        # Bind events for finishing input
+        self.value_entry.bind("<Return>", self.process_text_input)
+        self.value_entry.bind("<FocusOut>", self.process_text_input)
+
+        # Set focus
+        self.value_entry.focus()
+
+    def process_text_input(self, event):
+        """ Validate and apply user input """
+        try:
+            value = float(self.value_entry.get())
+            value = round(value / self.resolution) * self.resolution
+            if self.min_val <= value <= self.max_val:
+                self.set_value(value)
+        except ValueError:
+            pass  # Ignore invalid input
+
+        # Remove entry field and restore label
+        self.value_entry.destroy()
+        self.value_label.pack(side=tk.RIGHT, padx=(5, 0), pady=(5.5, 0))
