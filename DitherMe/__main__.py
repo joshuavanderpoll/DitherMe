@@ -96,6 +96,7 @@ class DitherMe:
         self.processed_gif_frames = []
         self.current_frame_index = 0
         self.playing = False
+        self.preprocessed_frames = 5
 
         self.original_width = 200
         self.original_height = 200
@@ -157,7 +158,14 @@ class DitherMe:
             if self.is_gif:
                 self.gif_durations = [frame.info.get("duration", 100) for frame in ImageSequence.Iterator(self.image)]
                 self.gif_frames = [frame.convert("RGBA") for frame in ImageSequence.Iterator(self.image)]
-                self.processed_gif_frames = self.gif_frames.copy()
+                self.processed_gif_frames = []
+                
+                # Preprocess only the first few frames
+                for i in range(min(self.preprocessed_frames, len(self.gif_frames))):
+                    self.processed_gif_frames.append(self.process_frame(self.gif_frames[i]))
+                
+                # Rest of the frames are processed lazily
+                self.processed_gif_frames.extend([None] * (len(self.gif_frames) - len(self.processed_gif_frames)))
             else:
                 self.image = self.image.convert("RGBA")
                 self.processed_image = self.image.copy()
@@ -191,11 +199,19 @@ class DitherMe:
         # Display checkerboard as background
         self.canvas_image.create_image(0, 0, anchor=tk.NW, image=self.checkerboard_bg_tk)
 
-
     def update_image(self):
         if self.is_gif:
-            self.processed_gif_frames = [self.process_frame(frame) for frame in self.gif_frames]
-            self.display_image(self.processed_gif_frames[0])
+            # Reset all processed frames to force reprocessing with new settings
+            self.processed_gif_frames = [None] * len(self.gif_frames)
+
+            # Process the first few frames to show immediate change
+            for i in range(min(self.preprocessed_frames, len(self.gif_frames))):
+                self.processed_gif_frames[i] = self.process_frame(self.gif_frames[i])
+            
+            # If a GIF is playing, update the current frame
+            if self.playing:
+                self.current_frame_index = 0  # Reset to the first frame to see changes immediately
+            self.display_image(self.processed_gif_frames[0])  # Display first frame with new settings
         elif self.image:
             self.processed_image = self.process_frame(self.image)
             self.display_image(self.processed_image)
@@ -345,8 +361,15 @@ class DitherMe:
 
     def animate(self):
         if self.playing and self.is_gif:
-            self.current_frame_index = (self.current_frame_index + 1) % len(self.processed_gif_frames)
+            if self.current_frame_index >= len(self.processed_gif_frames):
+                self.current_frame_index = 0
+
+            # Process frame if it hasn't been processed with the latest settings
+            if self.processed_gif_frames[self.current_frame_index] is None:
+                self.processed_gif_frames[self.current_frame_index] = self.process_frame(self.gif_frames[self.current_frame_index])
+
             self.display_image(self.processed_gif_frames[self.current_frame_index])
+            self.current_frame_index = (self.current_frame_index + 1) % len(self.processed_gif_frames)
             self.root.after(100, self.animate)
 
     def export_image(self):
@@ -358,18 +381,29 @@ class DitherMe:
 
         if file_path:
             if self.is_gif:
-                # Convert processed GIF frames to mode 'P' (palette-based) to preserve transparency
-                processed_frames = [frame.convert("RGBA") for frame in self.processed_gif_frames]
+                # Ensure all frames are processed before export
+                processed_frames = []
+                for frame in self.gif_frames:
+                    if self.processed_gif_frames[self.gif_frames.index(frame)] is None:
+                        processed_frame = self.process_frame(frame)
+                        self.processed_gif_frames[self.gif_frames.index(frame)] = processed_frame
+                    processed_frames.append(self.processed_gif_frames[self.gif_frames.index(frame)])
 
-                processed_frames[0].save(
-                    file_path,
-                    save_all=True,
-                    append_images=processed_frames[1:],
-                    loop=0,
-                    duration=self.gif_durations,
-                    transparency=255,
-                    disposal=2
-                )
+                # Convert processed GIF frames to mode 'P' (palette-based) to preserve transparency
+                processed_frames = [frame.convert("RGBA") for frame in processed_frames if frame is not None]
+
+                if processed_frames:  # Check if we have any frames to save
+                    processed_frames[0].save(
+                        file_path,
+                        save_all=True,
+                        append_images=processed_frames[1:],
+                        loop=0,
+                        duration=self.gif_durations[:len(processed_frames)],  # Match durations to frames
+                        transparency=255,
+                        disposal=2
+                    )
+                else:
+                    tk.messagebox.showerror("Export Error", "No frames available to export.")
             else:
                 # Save single processed image with transparency
                 self.processed_image.save(file_path, format="PNG")
