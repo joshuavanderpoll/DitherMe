@@ -1,6 +1,7 @@
 import os
 import sys
 import tkinter as tk
+from tkinter import ttk
 from tkinter import filedialog, colorchooser
 from PIL import Image, ImageTk, ImageColor, ImageEnhance, ImageFilter, ImageSequence, ImageDraw
 import numpy as np
@@ -8,6 +9,7 @@ import mimetypes
 
 from ui.slider import Slider
 from ui.button import Button
+from ui.progress_bar import ProgressBar
 
 class DitherMe:
     def __init__(self, root, startup_file=None):
@@ -87,6 +89,9 @@ class DitherMe:
         # Export Button
         self.export_btn = Button(self.frame_right, "Export Image", command=self.export_image)
         self.export_btn.pack(pady=10, padx=10)
+
+        # Progress Bar
+        self.progress_bar = ProgressBar(self.frame_right, height=20, bg_color="#1A1A23", fg_color="#006CE8", border_color="#1A1A23")
 
         # Image attributes
         self.image = None
@@ -381,13 +386,20 @@ class DitherMe:
 
         if file_path:
             if self.is_gif:
-                # Ensure all frames are processed before export
+                # Set up progress bar
+                total_frames = len(self.gif_frames)
+                self.progress_bar.set_progress(0)
+
                 processed_frames = []
-                for frame in self.gif_frames:
+                for i, frame in enumerate(self.gif_frames):
                     if self.processed_gif_frames[self.gif_frames.index(frame)] is None:
                         processed_frame = self.process_frame(frame)
                         self.processed_gif_frames[self.gif_frames.index(frame)] = processed_frame
                     processed_frames.append(self.processed_gif_frames[self.gif_frames.index(frame)])
+
+                    # Update progress bar
+                    self.progress_bar.set_progress((i + 1) / total_frames)
+                    self.root.update()
 
                 # Convert processed GIF frames to mode 'P' (palette-based) to preserve transparency
                 processed_frames = [frame.convert("RGBA") for frame in processed_frames if frame is not None]
@@ -402,11 +414,19 @@ class DitherMe:
                         transparency=255,
                         disposal=2
                     )
+
+                    # Reset progress bar after export
+                    self.progress_bar.set_progress(0)
+                    tk.messagebox.showinfo("Export Successful", "The GIF has been successfully exported.")
                 else:
                     tk.messagebox.showerror("Export Error", "No frames available to export.")
             else:
-                # Save single processed image with transparency
+                # For single image, we can just show a brief progress
+                self.progress_bar.set_progress(1)
+                self.root.update()
                 self.processed_image.save(file_path, format="PNG")
+                self.progress_bar.set_progress(0)
+                tk.messsagebox.showinfo("Export Successful", "The image has been successfully exported.")
 
 if __name__ == "__main__":
     startup_file = None
