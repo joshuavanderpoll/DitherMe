@@ -23,52 +23,20 @@
 ## 📜 Description 
 DitherMe is a Python-based image effect generator inspired by the iconic glitchy, dithered visuals seen in Watch Dogs 2's DedSec hacking sequences. It allows you to import and process images or GIFs, applying dithering effects with customizable settings, color palettes, pixelation, and noise controls.
 
-### 🎨 Features:
-- Dithering effects (Floyd-Steinberg algorithm)
-- Custom color palettes for dithering
+## 🎨 Features:
+- 25+ Dithering algorithms
+- Use custom colors for dithering
 - Transparency support (PNG)
 - GIF support – Play & process animated images
 - Pixelation, contrast, blur, and noise filters
 - Interactive sliders for real-time adjustments
-- One-click exporting for processed images & GIFs
-
-### Dithering Algorithms:
-- Error Diffusion Dithering (Error Correction)
-  - Floyd-Steinberg
-  - False Floyd-Steinberg
-  - Sierra
-  - Two-Row Sierra
-  - Sierra Lite
-  - Atkinson
-  - Jarvis, Judice & Ninke
-  - Stucki
-  - Burkes
-  - Lattice-Boltzmann
-  - Stevenson-Arce
-  - Knoll
-- Ordered Dithering
-  - Bayer (2x2)
-  - Bayer 4x4
-  - Bayer 8x8
-  - Clustered Dot 4x4
-- Pattern-Based Dithering
-  - Checkers Small
-  - Checkers Medium
-  - Checkers Large
-  - Radial Burst
-  - Spiral
-  - Vortex
-  - Diamond
-- Stochastic (Noise-Based) Dithering
-  - Random
-  - Blue Noise
-  - Void-and-Cluster
-
 
 ## 📚 Table of Contents
 - 📜 [Description](#-description)
+- 🎨 [Features](#-features)
 - ⚙️ [How to use](#️-how-to-use)
-- 🖼 [Previews](#-previews)
+- 🖼 [Preview](#-preview)
+- 🧙🏻 [Dithering Algorithms](#dithering-algorithms)
 - 💡 [Contribute](#-contribute)
 
 ## ⚙️ How to use
@@ -111,10 +79,42 @@ pip3 install -r requirements.txt
 python3 DitherMe
 ```
 
-## 🖼 Previews
+## 🖼 Preview
 <p align="center">
     <img src="assets/github/preview.png" alt="Preview">
 </p>
+
+## 🧙🏻 Dithering Algorithms:
+- Error Diffusion Dithering (Error Correction)
+  - Floyd-Steinberg
+  - False Floyd-Steinberg
+  - Sierra
+  - Two-Row Sierra
+  - Sierra Lite
+  - Atkinson
+  - Jarvis, Judice & Ninke
+  - Stucki
+  - Burkes
+  - Lattice-Boltzmann
+  - Stevenson-Arce
+  - Knoll
+- Ordered Dithering
+  - Bayer (2x2)
+  - Bayer 4x4
+  - Bayer 8x8
+  - Clustered Dot 4x4
+- Pattern-Based Dithering
+  - Checkers Small
+  - Checkers Medium
+  - Checkers Large
+  - Radial Burst
+  - Spiral
+  - Vortex
+  - Diamond
+- Stochastic (Noise-Based) Dithering
+  - Random
+  - Blue Noise
+  - Void-and-Cluster
 
 ## 💡 Contribute
 To contribute, first fork this repository, and `clone` it. Make your changes, whether you're fixing bugs, adding features, or improving translations. When done, `commit` your changes, `push` them, and submit a `pull request` for review to this repostiroy.
