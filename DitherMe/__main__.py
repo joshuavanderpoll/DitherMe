@@ -1,15 +1,15 @@
 import os
 import sys
 import tkinter as tk
-from tkinter import ttk
 from tkinter import filedialog, colorchooser
+import mimetypes
 from PIL import Image, ImageTk, ImageColor, ImageEnhance, ImageFilter, ImageSequence, ImageDraw
 import numpy as np
-import mimetypes
 
 from ui.slider import Slider
 from ui.button import Button
 from ui.progress_bar import ProgressBar
+import algorithms
 
 class DitherMe:
     def __init__(self, root, startup_file=None):
@@ -18,6 +18,18 @@ class DitherMe:
         self.root.geometry("1110x750")
         self.root.resizable(False, False)
         self.root.configure(bg="#1A1A23")
+
+        self.available_algorithms = {
+            "Floyd-Steinberg": algorithms.FloydSteinberg(),
+            "Sierra": algorithms.Sierra(),
+            "Two-Row Sierra": algorithms.TwoRowSierra(),
+            "Sierra Lite": algorithms.SierraLite(),
+            "Atkinson": algorithms.Atkinson(),
+            "Jarvis, Judice & Ninke": algorithms.JarvisJudiceNinke(),
+            "Stucki": algorithms.Stucki(),
+            "Burkes": algorithms.Burkes(),
+            "Lattice-Boltzmann": algorithms.LatticeBoltzmann(),
+        }
 
         # Sidebar
         self.frame_right = tk.Frame(root, width=300, bg="#2A2B35")
@@ -31,6 +43,11 @@ class DitherMe:
         # Upload Button
         self.upload_btn = Button(self.frame_right, "Upload Image/GIF", command=self.upload_image)
         self.upload_btn.pack(pady=10, padx=10)
+
+        # Algorithm Dropdown
+        self.selected_algorithm = tk.StringVar(value="Floyd-Steinberg")
+        self.algorithm_dropdown = tk.OptionMenu(self.frame_right, self.selected_algorithm, *self.available_algorithms.keys(), command=self.update_image)
+        self.algorithm_dropdown.pack(pady=10, padx=10, fill=tk.X)
 
         # Dictionary to store sliders
         self.sliders = {}
@@ -164,11 +181,11 @@ class DitherMe:
                 self.gif_durations = [frame.info.get("duration", 100) for frame in ImageSequence.Iterator(self.image)]
                 self.gif_frames = [frame.convert("RGBA") for frame in ImageSequence.Iterator(self.image)]
                 self.processed_gif_frames = []
-                
+
                 # Preprocess only the first few frames
                 for i in range(min(self.preprocessed_frames, len(self.gif_frames))):
                     self.processed_gif_frames.append(self.process_frame(self.gif_frames[i]))
-                
+
                 # Rest of the frames are processed lazily
                 self.processed_gif_frames.extend([None] * (len(self.gif_frames) - len(self.processed_gif_frames)))
             else:
@@ -178,7 +195,7 @@ class DitherMe:
             self.original_width, self.original_height = self.image.size
             self.update_canvas_size()
             self.update_image()
-            
+
     def update_canvas_size(self):
         max_width, max_height = 500, 500
         aspect_ratio = self.original_width / self.original_height
@@ -204,7 +221,7 @@ class DitherMe:
         # Display checkerboard as background
         self.canvas_image.create_image(0, 0, anchor=tk.NW, image=self.checkerboard_bg_tk)
 
-    def update_image(self):
+    def update_image(self, algorithm=None):
         if self.is_gif:
             # Reset all processed frames to force reprocessing with new settings
             self.processed_gif_frames = [None] * len(self.gif_frames)
@@ -212,7 +229,7 @@ class DitherMe:
             # Process the first few frames to show immediate change
             for i in range(min(self.preprocessed_frames, len(self.gif_frames))):
                 self.processed_gif_frames[i] = self.process_frame(self.gif_frames[i])
-            
+
             # If a GIF is playing, update the current frame
             if self.playing:
                 self.current_frame_index = 0  # Reset to the first frame to see changes immediately
@@ -267,7 +284,8 @@ class DitherMe:
         img_gray = self.apply_noise(img_gray)
 
         # Apply dithering
-        dithered_img = img_gray.convert("1", dither=Image.FLOYDSTEINBERG)
+        dither_algorithm = self.available_algorithms[self.selected_algorithm.get()]
+        dithered_img = dither_algorithm.apply_dither(img_gray)
         dithered_img = dithered_img.convert("RGBA")
 
         # Get user-selected colors and opacity
@@ -426,7 +444,7 @@ class DitherMe:
                 self.root.update()
                 self.processed_image.save(file_path, format="PNG")
                 self.progress_bar.set_progress(0)
-                tk.messsagebox.showinfo("Export Successful", "The image has been successfully exported.")
+                tk.messagebox.showinfo("Export Successful", "The image has been successfully exported.")
 
 if __name__ == "__main__":
     startup_file = None

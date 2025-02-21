@@ -5,3 +5,4 @@ build/
 *.spec
 .DS_Store
 assets/icon.iconset/
+.vscode/
