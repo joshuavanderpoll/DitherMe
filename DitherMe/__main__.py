@@ -22,7 +22,6 @@ class DitherMe:
         self.root = main_root
         self.root.title("DitherMe")
         self.root.geometry("1110x750")
-        self.root.resizable(False, False)
         self.root.configure(bg="#1A1A23")
 
         self.algorithms = {
@@ -89,7 +88,7 @@ class DitherMe:
         }
 
         # Sliders
-        self.add_slider("Scale", "scale", 1, 100, 100, self.update_image, True)
+        self.add_slider("Scale (%)", "scale", 1, 100, 100, self.update_image, True)
         self.add_slider("Contrast", "contrast", 0.5, 3.0, 1.0, self.update_image, 0.1)
         self.add_slider("Midtones", "midtones", 0.5, 3.0, 1.0, self.update_image, 0.1)
         self.add_slider("Highlights", "highlights", 0.5, 3.0, 1.0, self.update_image, 0.1)
@@ -160,8 +159,8 @@ class DitherMe:
 
         self.update_canvas_size()
 
-        if startup_file:
-            self.open_image(startup_file)
+        if startup_file and os.path.exists(startup_file):
+            self.upload_image(startup_file)
 
 
     def add_slider(self, label, key, from_, to, default, command, resolution=1):
@@ -205,13 +204,6 @@ class DitherMe:
         self.update_image()
 
 
-    def open_image(self, file_path: str):
-        """ Open an image file. """
-
-        if os.path.exists(file_path):
-            self.upload_image(file_path)
-
-
     def upload_image(self, file_path=None):
         """ Open a file dialog to upload an image. """
 
@@ -249,31 +241,31 @@ class DitherMe:
 
 
     def update_canvas_size(self):
-        """ Update the canvas size based on the image dimensions. """
+        """ Update the canvas size based on the frame size and display a checkerboard background when no image is loaded. """
+        self.root.update_idletasks()  # Ensure accurate container dimensions
+        container_width = self.frame_left.winfo_width()
+        container_height = self.frame_left.winfo_height()
 
-        max_width, max_height = 500, 500
-        aspect_ratio = self.original_width / self.original_height
+        if container_width == 1 or container_height == 1:
+            container_width, container_height = 500, 500  # Default size if not initialized yet
 
-        if self.original_width > max_width or self.original_height > max_height:
-            if aspect_ratio > 1:
-                self.current_width = max_width
-                self.current_height = int(max_width / aspect_ratio)
-            else:
-                self.current_height = max_height
-                self.current_width = int(max_height * aspect_ratio)
-        else:
-            self.current_width, self.current_height = self.original_width, self.original_height
+        self.current_width, self.current_height = container_width, container_height
 
         # Generate checkerboard background
         self.checkerboard_bg = self.create_checkerboard(self.current_width, self.current_height)
         self.checkerboard_bg_tk = ImageTk.PhotoImage(self.checkerboard_bg)
 
-        # Resize canvas to fit image
+        # Resize canvas to fit available space
         self.canvas_image.config(width=self.current_width, height=self.current_height)
-        self.canvas_image.pack()
+        self.canvas_image.pack(fill=tk.BOTH, expand=True)
 
-        # Display checkerboard as background
+        # Display checkerboard as the default background
         self.canvas_image.create_image(0, 0, anchor=tk.NW, image=self.checkerboard_bg_tk)
+        self.canvas_image.image = self.checkerboard_bg_tk
+
+        # If an image is loaded, update the displayed image
+        if self.image:
+            self.update_image()
 
 
     def update_image(self, algorithm=None):
@@ -397,27 +389,12 @@ class DitherMe:
         return Image.fromarray(np_img)
 
 
-    def apply_dithering(self, img):
-        """ Apply dithering effect """
-
-        gray_image = img.convert("L")
-        dithered_image = gray_image.convert("1", dither=Image.FLOYDSTEINBERG)
-        dithered_rgb = dithered_image.convert("RGB")
-
-        pixels = dithered_rgb.load()
-        for y in range(dithered_rgb.height):
-            for x in range(dithered_rgb.width):
-                if pixels[x, y] == (255, 255, 255):
-                    pixels[x, y] = self.selected_foreground
-                else:
-                    pixels[x, y] = self.selected_background
-
-        return dithered_rgb
-
-
     def display_image(self, img):
-        """ Display the image on the canvas. """
+        """ Display the image on the canvas with full width and auto height. """
+        if img is None:
+            return
 
+        # Resize image to match full width while maintaining aspect ratio
         img = img.resize((self.current_width, self.current_height), Image.LANCZOS)
 
         # Composite over checkerboard
@@ -425,7 +402,7 @@ class DitherMe:
 
         # Convert to Tkinter format and display
         img_tk = ImageTk.PhotoImage(composite)
-        self.canvas_image.create_image(self.current_width // 2, self.current_height // 2, image=img_tk)
+        self.canvas_image.create_image(0, 0, anchor=tk.NW, image=img_tk)
         self.canvas_image.image = img_tk
 
 
