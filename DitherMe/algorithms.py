@@ -1,4 +1,5 @@
 """ Dithering algorithms used by DitherMe. """
+# pylint: disable=line-too-long, unused-variable, no-member
 
 import numpy as np
 from PIL import Image
@@ -38,6 +39,23 @@ class ErrorDiffusionDither(DitherAlgorithm):
                     if 0 <= ny < height and 0 <= nx < width:
                         np_img[ny, nx] += quant_error * (weight / divisor)
 
+        return Image.fromarray((np_img * 255).astype(np.uint8)).convert("1")
+
+class CheckeredDither(DitherAlgorithm):
+    """Base class for checkered dithers with different sizes."""
+    def __init__(self, size):
+        self.size = size
+
+    def apply_dither(self, img):
+        img = img.convert("L")
+        np_img = np.array(img, dtype=np.float32) / 255.0
+        height, width = np_img.shape
+        for y in range(height):
+            for x in range(width):
+                if ((y // self.size) + (x // self.size)) % 2 == 0:
+                    np_img[y, x] = 1 if np_img[y, x] > 0.5 else 0
+                else:
+                    np_img[y, x] = 0
         return Image.fromarray((np_img * 255).astype(np.uint8)).convert("1")
 
 class FloydSteinberg(ErrorDiffusionDither):
@@ -116,3 +134,100 @@ class LatticeBoltzmann(DitherAlgorithm):
         lbm = np_img + noise
         dithered = lbm >= 0.5
         return Image.fromarray(dithered.astype(np.uint8) * 255).convert("1")
+
+class Bayer(DitherAlgorithm):
+    """Implements Bayer-ordered dithering."""
+
+    def apply_dither(self, img):
+        img = img.convert("L")
+        bayer_matrix = np.array([[0, 2], [3, 1]]) / 4.0
+        np_img = np.array(img, dtype=np.float32) / 255.0
+        height, width = np_img.shape
+        for y in range(height):
+            for x in range(width):
+                threshold = bayer_matrix[y % 2, x % 2]
+                np_img[y, x] = 1 if np_img[y, x] > threshold else 0
+        return Image.fromarray((np_img * 255).astype(np.uint8)).convert("1")
+
+
+class Random(DitherAlgorithm):
+    """Implements random-ordered dithering."""
+
+    def apply_dither(self, img):
+        img = img.convert("L")
+        np_img = np.array(img, dtype=np.float32) / 255.0
+        noise = np.random.rand(*np_img.shape)
+        dithered = np_img > noise
+        return Image.fromarray((dithered * 255).astype(np.uint8)).convert("1")
+
+class CheckersSmall(CheckeredDither):
+    """Small checkered dithering."""
+
+    def __init__(self):
+        super().__init__(size=2)
+
+
+class CheckersMedium(CheckeredDither):
+    """Medium checkered dithering."""
+
+    def __init__(self):
+        super().__init__(size=4)
+
+
+class CheckersLarge(CheckeredDither):
+    """Large checkered dithering."""
+
+    def __init__(self):
+        super().__init__(size=8)
+
+
+### Artistic Dithers
+class RadialBurst(DitherAlgorithm):
+    """Implements radial burst dithering."""
+
+    def apply_dither(self, img):
+        img = img.convert("L")
+        np_img = np.array(img, dtype=np.float32) / 255.0
+        height, width = np_img.shape
+        cy, cx = height // 2, width // 2
+        for y in range(height):
+            for x in range(width):
+                r = np.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+                np_img[y, x] = 1 if np_img[y, x] > (r % 20) / 20 else 0
+        return Image.fromarray((np_img * 255).astype(np.uint8)).convert("1")
+
+
+class Vortex(DitherAlgorithm):
+    """Implements vortex dithering."""
+
+    def apply_dither(self, img):
+        img = img.convert("L")
+        np_img = np.array(img, dtype=np.float32) / 255.0
+        height, width = np_img.shape
+        for y in range(height):
+            for x in range(width):
+                angle = np.arctan2(y - height // 2, x - width // 2)
+                np_img[y, x] = 1 if np_img[y, x] > (angle % np.pi) / np.pi else 0
+        return Image.fromarray((np_img * 255).astype(np.uint8)).convert("1")
+
+
+class Diamond(DitherAlgorithm):
+    """Implements diamond dithering."""
+
+    def apply_dither(self, img):
+        img = img.convert("L")
+        np_img = np.array(img, dtype=np.float32) / 255.0
+        height, width = np_img.shape
+        for y in range(height):
+            for x in range(width):
+                d = abs(y - height // 2) + abs(x - width // 2)
+                np_img[y, x] = 1 if np_img[y, x] > (d % 20) / 20 else 0
+        return Image.fromarray((np_img * 255).astype(np.uint8)).convert("1")
+
+
+class Mosaic(DitherAlgorithm):
+    """Implements mosaic dithering."""
+
+    def apply_dither(self, img):
+        img = img.convert("L").resize((img.width // 10, img.height // 10), Image.NEAREST).resize(img.size, Image.NEAREST)
+        return img.convert("1")

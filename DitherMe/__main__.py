@@ -34,6 +34,14 @@ class DitherMe:
             "Stucki": algorithms.Stucki(),
             "Burkes": algorithms.Burkes(),
             "Lattice-Boltzmann": algorithms.LatticeBoltzmann(),
+            "Bayer": algorithms.Bayer(),
+            "Random": algorithms.Random(),
+            "Checkers Small": algorithms.CheckersSmall(),
+            "Checkers Medium": algorithms.CheckersMedium(),
+            "Checkers Large": algorithms.CheckersLarge(),
+            "Radial Burst": algorithms.RadialBurst(),
+            "Vortex": algorithms.Vortex(),
+            "Diamond": algorithms.Diamond(),
         }
 
         # Sidebar
@@ -319,7 +327,7 @@ class DitherMe:
 
         # Convert image to NumPy array
         dithered_pixels = np.array(dithered_img, dtype=np.uint8)
-        alpha_pixels = np.array(img_alpha.resize(dithered_pixels.shape[:2], Image.LANCZOS), dtype=np.uint8)
+        alpha_pixels = np.array(img_alpha.resize((dithered_pixels.shape[1], dithered_pixels.shape[0]), Image.LANCZOS), dtype=np.uint8)
 
         # Create a mask for dithering (white -> foreground, black -> background)
         mask = (dithered_pixels[:, :, 0] > 128).astype(np.float32)  # White pixels (foreground)
