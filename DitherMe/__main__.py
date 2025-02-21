@@ -14,6 +14,7 @@ from ui.button import Button
 from ui.progress_bar import ProgressBar
 import algorithms
 
+
 class DitherMe:
     """ Main application class for DitherMe. """
 
@@ -25,7 +26,9 @@ class DitherMe:
         self.root.configure(bg="#1A1A23")
 
         self.algorithms = {
+            # Error Diffusion Dithering
             "Floyd-Steinberg": algorithms.FloydSteinberg(),
+            "False Floyd-Steinberg": algorithms.FalseFloydSteinberg(),
             "Sierra": algorithms.Sierra(),
             "Two-Row Sierra": algorithms.TwoRowSierra(),
             "Sierra Lite": algorithms.SierraLite(),
@@ -33,15 +36,31 @@ class DitherMe:
             "Jarvis, Judice & Ninke": algorithms.JarvisJudiceNinke(),
             "Stucki": algorithms.Stucki(),
             "Burkes": algorithms.Burkes(),
+            "Stevenson-Arce": algorithms.StevensonArce(),
+            "Knoll": algorithms.Knoll(),
+
+            # Ordered Dithering
             "Lattice-Boltzmann": algorithms.LatticeBoltzmann(),
             "Bayer": algorithms.Bayer(),
+            "Bayer 4x4": algorithms.Bayer4x4(),
+            "Bayer 8x8": algorithms.Bayer8x8(),
+            "Clustered Dot 4x4": algorithms.ClusteredDot4x4(),
+
+            # Noise-Based Dithering
             "Random": algorithms.Random(),
+            "Blue Noise": algorithms.BlueNoise(),
+            "Void-and-Cluster": algorithms.VoidAndCluster(),
+
+            # Checkered Dithering
             "Checkers Small": algorithms.CheckersSmall(),
             "Checkers Medium": algorithms.CheckersMedium(),
             "Checkers Large": algorithms.CheckersLarge(),
+
+            # Artistic Dithering
             "Radial Burst": algorithms.RadialBurst(),
             "Vortex": algorithms.Vortex(),
             "Diamond": algorithms.Diamond(),
+            "Spiral": algorithms.Spiral(),
         }
 
         # Sidebar
@@ -144,11 +163,13 @@ class DitherMe:
         if startup_file:
             self.open_image(startup_file)
 
+
     def add_slider(self, label, key, from_, to, default, command, resolution=1):
         """ Add a slider UI item. """
 
         slider = Slider(self.frame_right, label, min_val=from_, max_val=to, default_val=default, command=lambda v: command(), resolution=resolution)
         self.sliders[key] = slider
+
 
     def pick_foreground(self):
         """ Open color picker for foreground color. """
@@ -159,6 +180,7 @@ class DitherMe:
             self.foreground_btn.update_preview_color(color_code)
             self.update_image()
 
+
     def pick_background(self):
         """ Open color picker for background color. """
 
@@ -167,6 +189,7 @@ class DitherMe:
             self.selected_background = color_code
             self.background_btn.update_preview_color(color_code)
             self.update_image()
+
 
     def reset_options(self):
         """ Reset all options to default values. """
@@ -181,11 +204,13 @@ class DitherMe:
 
         self.update_image()
 
+
     def open_image(self, file_path: str):
         """ Open an image file. """
 
         if os.path.exists(file_path):
             self.upload_image(file_path)
+
 
     def upload_image(self, file_path=None):
         """ Open a file dialog to upload an image. """
@@ -222,6 +247,7 @@ class DitherMe:
             self.update_canvas_size()
             self.update_image()
 
+
     def update_canvas_size(self):
         """ Update the canvas size based on the image dimensions. """
 
@@ -249,6 +275,7 @@ class DitherMe:
         # Display checkerboard as background
         self.canvas_image.create_image(0, 0, anchor=tk.NW, image=self.checkerboard_bg_tk)
 
+
     def update_image(self, algorithm=None):
         """ Update the displayed image based on the current settings. """
 
@@ -267,6 +294,7 @@ class DitherMe:
         elif self.image:
             self.processed_image = self.process_frame(self.image)
             self.display_image(self.processed_image)
+
 
     def process_frame(self, img):
         """ Process an image frame."""
@@ -354,6 +382,7 @@ class DitherMe:
 
         return final_image
 
+
     def apply_noise(self, img):
         """ Apply noise to the image """
 
@@ -366,6 +395,7 @@ class DitherMe:
         np_img = np.clip(np_img + noise, 0, 255).astype(np.uint8)
 
         return Image.fromarray(np_img)
+
 
     def apply_dithering(self, img):
         """ Apply dithering effect """
@@ -384,6 +414,7 @@ class DitherMe:
 
         return dithered_rgb
 
+
     def display_image(self, img):
         """ Display the image on the canvas. """
 
@@ -396,6 +427,7 @@ class DitherMe:
         img_tk = ImageTk.PhotoImage(composite)
         self.canvas_image.create_image(self.current_width // 2, self.current_height // 2, image=img_tk)
         self.canvas_image.image = img_tk
+
 
     def create_checkerboard(self, width, height, box_size=10):
         """ Create a checkerboard pattern as a background. """
@@ -410,16 +442,19 @@ class DitherMe:
 
         return pattern
 
+
     def play_gif(self):
         """ Play the GIF animation """
 
         self.playing = True
         self.animate()
 
+
     def stop_gif(self):
         """ Stop the GIF animation """
 
         self.playing = False
+
 
     def animate(self):
         """ Animate the GIF frames """
@@ -435,6 +470,7 @@ class DitherMe:
             self.display_image(self.processed_gif_frames[self.current_frame_index])
             self.current_frame_index = (self.current_frame_index + 1) % len(self.processed_gif_frames)
             self.root.after(100, self.animate)
+
 
     def export_image(self):
         """ Export the image to a file. """
@@ -488,6 +524,7 @@ class DitherMe:
                 self.processed_image.save(file_path, format="PNG")
                 self.progress_bar.set_progress(0)
                 tk.messagebox.showinfo("Export Successful", "The image has been successfully exported.")
+
 
 if __name__ == "__main__":
     ARGV_FILE = None
