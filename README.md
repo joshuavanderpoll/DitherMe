@@ -25,6 +25,17 @@ DitherMe is a Python-based image effect generator inspired by the iconic glitchy
 - Interactive sliders for real-time adjustments
 - One-click exporting for processed images & GIFs
 
+### Dithering Algorithms:
+- Floyd-Steinberg
+- Sierra
+- Two-Row Sierra
+- Sierra Lite
+- Atkinson
+- Jarvis, Judice & Ninke
+- Stucki
+- Burkes
+- Lattice-Boltzmann
+
 ## 📚 Table of Contents
 - 📜 [Description](#-description)
 - ⚙️ [How to use](#️-how-to-use)
