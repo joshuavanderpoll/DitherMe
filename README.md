@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/github/banner.jpg" height="300px" alt="DitherMe banner">
+</p>
+
 <h1 align="center">DitherMe - Dither your images and GIFs</h1>
 
 <p align="center">
@@ -10,6 +14,9 @@
     </a>
     <a href="https://github.com/joshuavanderpoll/DitherMe/releases">
         <img src="https://img.shields.io/badge/Download-32cd32?style=for-the-badge" alt="download" />
+    </a>
+    <a href="https://ditherme.joshua-server.nl?utm_source=github&utm_medium=readme&utm_id=ditherme" target="_blank">
+        <img src="https://img.shields.io/badge/Website-red?style=for-the-badge" alt="website" />
     </a>
 </p>
 
