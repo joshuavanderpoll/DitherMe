@@ -46,7 +46,7 @@ class FloydSteinberg(ErrorDiffusionDither):
     def apply_dither(self, img):
         matrix = [(0, 1, 7), (1, -1, 3), (1, 0, 5), (1, 1, 1)]
         return self.distribute_error(img, matrix, 16)
-    
+
 class Sierra(ErrorDiffusionDither):
     """Implements full Sierra dithering."""
 

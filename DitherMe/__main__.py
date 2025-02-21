@@ -91,7 +91,7 @@ class DitherMe:
         self.reset_btn.pack(pady=10, padx=10)
 
         # Container for Image Preview
-        self.image_container = tk.Frame(self.frame_left, bg="#2A2B35", relief=tk.RIDGE) 
+        self.image_container = tk.Frame(self.frame_left, bg="#2A2B35", relief=tk.RIDGE)
         self.image_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Canvas for main image
@@ -398,7 +398,7 @@ class DitherMe:
         for y in range(0, height, box_size * 2):
             for x in range(0, width, box_size * 2):
                 draw.rectangle([x, y, x + box_size, y + box_size], fill="#E0E0E0")  # Lighter box
-                draw.rectangle([x + box_size, y + box_size, x + box_size * 2, y + box_size * 2], fill="#E0E0E0")  
+                draw.rectangle([x + box_size, y + box_size, x + box_size * 2, y + box_size * 2], fill="#E0E0E0")
 
         return pattern
 
