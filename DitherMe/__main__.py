@@ -1,3 +1,6 @@
+""" DitherMe application """
+# pylint: disable=line-too-long, unused-argument, no-member
+
 import os
 import sys
 import tkinter as tk
@@ -12,14 +15,16 @@ from ui.progress_bar import ProgressBar
 import algorithms
 
 class DitherMe:
-    def __init__(self, root, startup_file=None):
-        self.root = root
+    """ Main application class for DitherMe. """
+
+    def __init__(self, main_root, startup_file=None):
+        self.root = main_root
         self.root.title("DitherMe")
         self.root.geometry("1110x750")
         self.root.resizable(False, False)
         self.root.configure(bg="#1A1A23")
 
-        self.available_algorithms = {
+        self.algorithms = {
             "Floyd-Steinberg": algorithms.FloydSteinberg(),
             "Sierra": algorithms.Sierra(),
             "Two-Row Sierra": algorithms.TwoRowSierra(),
@@ -32,12 +37,12 @@ class DitherMe:
         }
 
         # Sidebar
-        self.frame_right = tk.Frame(root, width=300, bg="#2A2B35")
+        self.frame_right = tk.Frame(self.root, width=300, bg="#2A2B35")
         self.frame_right.pack(side=tk.RIGHT, fill=tk.Y)
         self.frame_right.pack_propagate(False)
 
         # Main content
-        self.frame_left = tk.Frame(root, bg="#1A1A23")
+        self.frame_left = tk.Frame(self.root, bg="#1A1A23")
         self.frame_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Upload Button
@@ -46,7 +51,7 @@ class DitherMe:
 
         # Algorithm Dropdown
         self.selected_algorithm = tk.StringVar(value="Floyd-Steinberg")
-        self.algorithm_dropdown = tk.OptionMenu(self.frame_right, self.selected_algorithm, *self.available_algorithms.keys(), command=self.update_image)
+        self.algorithm_dropdown = tk.OptionMenu(self.frame_right, self.selected_algorithm, *self.algorithms.keys(), command=self.update_image)
         self.algorithm_dropdown.pack(pady=10, padx=10, fill=tk.X)
 
         # Dictionary to store sliders
@@ -115,6 +120,7 @@ class DitherMe:
         self.processed_image = None
         self.is_gif = False
         self.gif_frames = []
+        self.gif_durations = []
         self.processed_gif_frames = []
         self.current_frame_index = 0
         self.playing = False
@@ -131,10 +137,14 @@ class DitherMe:
             self.open_image(startup_file)
 
     def add_slider(self, label, key, from_, to, default, command, resolution=1):
+        """ Add a slider UI item. """
+
         slider = Slider(self.frame_right, label, min_val=from_, max_val=to, default_val=default, command=lambda v: command(), resolution=resolution)
         self.sliders[key] = slider
 
     def pick_foreground(self):
+        """ Open color picker for foreground color. """
+
         color_code = colorchooser.askcolor(title="Choose Foreground Color")[1]
         if color_code:
             self.selected_foreground = color_code
@@ -142,6 +152,8 @@ class DitherMe:
             self.update_image()
 
     def pick_background(self):
+        """ Open color picker for background color. """
+
         color_code = colorchooser.askcolor(title="Choose Background Color")[1]
         if color_code:
             self.selected_background = color_code
@@ -149,6 +161,8 @@ class DitherMe:
             self.update_image()
 
     def reset_options(self):
+        """ Reset all options to default values. """
+
         for key, value in self.default_values.items():
             self.sliders[key].set_value(value)
 
@@ -160,10 +174,14 @@ class DitherMe:
         self.update_image()
 
     def open_image(self, file_path: str):
+        """ Open an image file. """
+
         if os.path.exists(file_path):
             self.upload_image(file_path)
 
     def upload_image(self, file_path=None):
+        """ Open a file dialog to upload an image. """
+
         if not file_path:
             file_path = filedialog.askopenfilename()
 
@@ -197,6 +215,8 @@ class DitherMe:
             self.update_image()
 
     def update_canvas_size(self):
+        """ Update the canvas size based on the image dimensions. """
+
         max_width, max_height = 500, 500
         aspect_ratio = self.original_width / self.original_height
 
@@ -222,6 +242,8 @@ class DitherMe:
         self.canvas_image.create_image(0, 0, anchor=tk.NW, image=self.checkerboard_bg_tk)
 
     def update_image(self, algorithm=None):
+        """ Update the displayed image based on the current settings. """
+
         if self.is_gif:
             # Reset all processed frames to force reprocessing with new settings
             self.processed_gif_frames = [None] * len(self.gif_frames)
@@ -284,14 +306,14 @@ class DitherMe:
         img_gray = self.apply_noise(img_gray)
 
         # Apply dithering
-        dither_algorithm = self.available_algorithms[self.selected_algorithm.get()]
+        dither_algorithm = self.algorithms[self.selected_algorithm.get()]
         dithered_img = dither_algorithm.apply_dither(img_gray)
         dithered_img = dithered_img.convert("RGBA")
 
         # Get user-selected colors and opacity
         fg_color = np.array(ImageColor.getrgb(self.selected_foreground), dtype=np.uint8)
         bg_color = np.array(ImageColor.getrgb(self.selected_background), dtype=np.uint8)
-        
+
         fg_opacity = self.sliders["foreground_opacity"].get_value() / 255.0  # Convert to range [0,1]
         bg_opacity = self.sliders["background_opacity"].get_value() / 255.0  # Convert to range [0,1]
 
@@ -326,6 +348,7 @@ class DitherMe:
 
     def apply_noise(self, img):
         """ Apply noise to the image """
+
         noise_level = self.sliders["noise"].get_value()
         if noise_level == 0:
             return img  # No noise applied
@@ -338,6 +361,7 @@ class DitherMe:
 
     def apply_dithering(self, img):
         """ Apply dithering effect """
+
         gray_image = img.convert("L")
         dithered_image = gray_image.convert("1", dither=Image.FLOYDSTEINBERG)
         dithered_rgb = dithered_image.convert("RGB")
@@ -353,6 +377,8 @@ class DitherMe:
         return dithered_rgb
 
     def display_image(self, img):
+        """ Display the image on the canvas. """
+
         img = img.resize((self.current_width, self.current_height), Image.LANCZOS)
 
         # Composite over checkerboard
@@ -364,6 +390,8 @@ class DitherMe:
         self.canvas_image.image = img_tk
 
     def create_checkerboard(self, width, height, box_size=10):
+        """ Create a checkerboard pattern as a background. """
+
         pattern = Image.new("RGB", (width, height), "#BFBFBF")  # Light gray base
 
         draw = ImageDraw.Draw(pattern)
@@ -376,13 +404,18 @@ class DitherMe:
 
     def play_gif(self):
         """ Play the GIF animation """
+
         self.playing = True
         self.animate()
 
     def stop_gif(self):
+        """ Stop the GIF animation """
+
         self.playing = False
 
     def animate(self):
+        """ Animate the GIF frames """
+
         if self.playing and self.is_gif:
             if self.current_frame_index >= len(self.processed_gif_frames):
                 self.current_frame_index = 0
@@ -396,6 +429,8 @@ class DitherMe:
             self.root.after(100, self.animate)
 
     def export_image(self):
+        """ Export the image to a file. """
+
         if not self.processed_image and not self.processed_gif_frames:
             return  # No image to save
 
@@ -447,11 +482,11 @@ class DitherMe:
                 tk.messagebox.showinfo("Export Successful", "The image has been successfully exported.")
 
 if __name__ == "__main__":
-    startup_file = None
+    ARGV_FILE = None
 
     if len(sys.argv) > 1:
-        startup_file = sys.argv[1]
+        ARGV_FILE = sys.argv[1]
 
     root = tk.Tk()
-    app = DitherMe(root, startup_file)
+    app = DitherMe(root, ARGV_FILE)
     root.mainloop()

@@ -8,13 +8,20 @@ class DitherAlgorithm:
 
     def apply_dither(self, img):
         """Applies dithering to the input image."""
+
         raise NotImplementedError("Dithering mode must implement apply_dither method")
 
 class ErrorDiffusionDither(DitherAlgorithm):
     """Base class for all error diffusion dithering algorithms."""
 
+    def apply_dither(self, img):
+        """Placeholder method to satisfy the abstract method requirement."""
+
+        raise NotImplementedError("Subclasses should implement this method")
+
     def distribute_error(self, img, matrix, divisor):
         """Applies error diffusion based on the given diffusion matrix."""
+
         img = img.convert("L")  # Ensure grayscale
         np_img = np.array(img, dtype=np.float32) / 255.0
         height, width = np_img.shape
