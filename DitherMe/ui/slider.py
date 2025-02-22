@@ -1,6 +1,11 @@
+""" Slider UI element """
+# pylint: disable=line-too-long, unused-argument
+
 import tkinter as tk
 
 class Slider(tk.Canvas):
+    """ Slider class """
+
     def __init__(self, parent, label: str, min_val: float, max_val: float, default_val: float, command=None, resolution=1):
         super().__init__(parent, height=40, bg="#2A2B35", highlightthickness=0)
 
@@ -12,9 +17,10 @@ class Slider(tk.Canvas):
 
         self.width = 260
         self.slider_width = int(self.width * 0.95)
-        self.text_width = int(self.width * 0.05) 
+        self.text_width = int(self.width * 0.05)
         self.slider_height = 8
         self.dot_radius = 8
+        self.value_entry = None
 
         self.current_value = default_val
 
@@ -51,8 +57,10 @@ class Slider(tk.Canvas):
 
         self.update_slider_position()
 
+
     def move_knob(self, event):
         """ Move the slider knob based on mouse position """
+
         x = max(10, min(event.x, self.slider_width - 10))
 
         # Convert x position to value
@@ -71,8 +79,10 @@ class Slider(tk.Canvas):
             if self.command:
                 self.command(new_value)
 
+
     def update_slider_position(self):
         """ Update visual representation of the slider """
+
         percentage = (self.current_value - self.min_val) / (self.max_val - self.min_val)
         knob_x = int(10 + percentage * (self.slider_width - 20))
 
@@ -85,18 +95,24 @@ class Slider(tk.Canvas):
         # Update the displayed value
         self.value_label.config(text=str(round(self.current_value, 1)))
 
+
     def get_value(self):
         """ Return the current value of the slider """
+
         return self.current_value
+
 
     def set_value(self, value):
         """ Set the slider value programmatically """
+
         self.current_value = max(self.min_val, min(value, self.max_val))
         self.update_slider_position()
         self.value_label.config(text=str(round(self.current_value, 1)))  # Update the displayed value
 
+
     def enable_text_input(self, event):
         """ Replace the label with an entry field for manual input """
+
         self.value_entry = tk.Entry(self.slider_row, width=4, bg="#2A2B35", fg="white", insertbackground="white")
         self.value_entry.insert(0, str(self.current_value))
         self.value_entry.pack(side=tk.RIGHT, padx=(5, 0), pady=(5.5, 0))
@@ -111,8 +127,10 @@ class Slider(tk.Canvas):
         # Set focus
         self.value_entry.focus()
 
+
     def process_text_input(self, event):
         """ Validate and apply user input """
+
         try:
             value = float(self.value_entry.get())
             value = round(value / self.resolution) * self.resolution

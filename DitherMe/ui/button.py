@@ -1,6 +1,11 @@
+""" Button UI element """
+# pylint: disable=line-too-long, unused-argument
+
 import tkinter as tk
 
 class Button(tk.Canvas):
+    """ Button class """
+
     def __init__(self, parent, text, command=None, height=36, width=None, font=("Arial", 10), color_preview=False):
         super().__init__(parent, height=height, bg="#474751", highlightthickness=0)
 
@@ -93,4 +98,3 @@ class Button(tk.Canvas):
         if self.color_preview:
             self.preview_color = new_color
             self.itemconfig(self.color_circle, fill=new_color)
-

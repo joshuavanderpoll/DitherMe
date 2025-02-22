@@ -22,7 +22,6 @@ class DitherMe:
         self.root = main_root
         self.root.title("DitherMe")
         self.root.geometry("1110x750")
-        self.root.resizable(False, False)
         self.root.configure(bg="#1A1A23")
 
         self.algorithms = {
@@ -89,7 +88,7 @@ class DitherMe:
         }
 
         # Sliders
-        self.add_slider("Scale", "scale", 1, 100, 100, self.update_image, True)
+        self.add_slider("Scale (%)", "scale", 1, 100, 100, self.update_image, True)
         self.add_slider("Contrast", "contrast", 0.5, 3.0, 1.0, self.update_image, 0.1)
         self.add_slider("Midtones", "midtones", 0.5, 3.0, 1.0, self.update_image, 0.1)
         self.add_slider("Highlights", "highlights", 0.5, 3.0, 1.0, self.update_image, 0.1)
@@ -160,8 +159,8 @@ class DitherMe:
 
         self.update_canvas_size()
 
-        if startup_file:
-            self.open_image(startup_file)
+        if startup_file and os.path.exists(startup_file):
+            self.upload_image(startup_file)
 
 
     def add_slider(self, label, key, from_, to, default, command, resolution=1):
@@ -203,13 +202,6 @@ class DitherMe:
         self.background_btn.update_preview_color(self.selected_background)
 
         self.update_image()
-
-
-    def open_image(self, file_path: str):
-        """ Open an image file. """
-
-        if os.path.exists(file_path):
-            self.upload_image(file_path)
 
 
     def upload_image(self, file_path=None):
@@ -395,24 +387,6 @@ class DitherMe:
         np_img = np.clip(np_img + noise, 0, 255).astype(np.uint8)
 
         return Image.fromarray(np_img)
-
-
-    def apply_dithering(self, img):
-        """ Apply dithering effect """
-
-        gray_image = img.convert("L")
-        dithered_image = gray_image.convert("1", dither=Image.FLOYDSTEINBERG)
-        dithered_rgb = dithered_image.convert("RGB")
-
-        pixels = dithered_rgb.load()
-        for y in range(dithered_rgb.height):
-            for x in range(dithered_rgb.width):
-                if pixels[x, y] == (255, 255, 255):
-                    pixels[x, y] = self.selected_foreground
-                else:
-                    pixels[x, y] = self.selected_background
-
-        return dithered_rgb
 
 
     def display_image(self, img):
