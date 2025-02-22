@@ -229,14 +229,7 @@ class DitherMe:
             if self.is_gif:
                 self.gif_durations = [frame.info.get("duration", 100) for frame in ImageSequence.Iterator(self.image)]
                 self.gif_frames = [frame.convert("RGBA") for frame in ImageSequence.Iterator(self.image)]
-                self.processed_gif_frames = []
-
-                # Preprocess only the first few frames
-                for i in range(min(self.preprocessed_frames, len(self.gif_frames))):
-                    self.processed_gif_frames.append(self.process_frame(self.gif_frames[i]))
-
-                # Rest of the frames are processed lazily
-                self.processed_gif_frames.extend([None] * (len(self.gif_frames) - len(self.processed_gif_frames)))
+                self.processed_gif_frames = [self.process_frame(frame) for frame in self.gif_frames]
             else:
                 self.image = self.image.convert("RGBA")
                 self.processed_image = self.image.copy()
@@ -278,17 +271,11 @@ class DitherMe:
         """ Update the displayed image based on the current settings. """
 
         if self.is_gif:
-            # Reset all processed frames to force reprocessing with new settings
-            self.processed_gif_frames = [None] * len(self.gif_frames)
+            self.processed_gif_frames = [self.process_frame(frame) for frame in self.gif_frames]
 
-            # Process the first few frames to show immediate change
-            for i in range(min(self.preprocessed_frames, len(self.gif_frames))):
-                self.processed_gif_frames[i] = self.process_frame(self.gif_frames[i])
-
-            # If a GIF is playing, update the current frame
-            if self.playing:
-                self.current_frame_index = 0  # Reset to the first frame to see changes immediately
-            self.display_image(self.processed_gif_frames[0])  # Display first frame with new settings
+            # Reset to first frame
+            self.current_frame_index = 0
+            self.display_image(self.processed_gif_frames[0])
         elif self.image:
             self.processed_image = self.process_frame(self.image)
             self.display_image(self.processed_image)
@@ -443,13 +430,11 @@ class DitherMe:
             if self.current_frame_index >= len(self.processed_gif_frames):
                 self.current_frame_index = 0
 
-            # Process frame if it hasn't been processed with the latest settings
-            if self.processed_gif_frames[self.current_frame_index] is None:
-                self.processed_gif_frames[self.current_frame_index] = self.process_frame(self.gif_frames[self.current_frame_index])
-
             self.display_image(self.processed_gif_frames[self.current_frame_index])
             self.current_frame_index = (self.current_frame_index + 1) % len(self.processed_gif_frames)
-            self.root.after(100, self.animate)
+
+            frame_duration = self.gif_durations[self.current_frame_index]
+            self.root.after(frame_duration, self.animate)
 
 
     def export_image(self):
