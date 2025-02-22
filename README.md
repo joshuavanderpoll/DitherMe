@@ -71,7 +71,7 @@ pip3 install -r requirements.txt
 
 # Install PNG Lib
 make clean
-make 
+make
 
 # Compile and install all Dithering algorithms
 python setup.py clean --all

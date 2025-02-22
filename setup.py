@@ -26,12 +26,15 @@ dither_algorithms = [
     "burkes",
     "stucki",
     "jarvis_judice_ninke",
+    "knoll", 
+    "stevenson_arce",
 
     # Ordered dithering
     "bayer_2x2", 
     "bayer_4x4", 
     "bayer_8x8", 
     "clustered_dot_4x4",
+    "lattice_boltzmann",
 
     # Checkered dithering
     "checkered_small",

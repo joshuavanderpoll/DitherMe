@@ -13,7 +13,7 @@ import numpy as np
 from ui.slider import Slider
 from ui.button import Button
 from ui.progress_bar import ProgressBar
-from DitherMe.algorithms import floydsteinberg, false_floydsteinberg, sierra, sierra_lite, sierra_two_row, atkinson, burkes, stucki, jarvis_judice_ninke, bayer_2x2, bayer_4x4, bayer_8x8, clustered_dot_4x4, checkered_small, checkered_medium, checkered_large
+from DitherMe.algorithms import floydsteinberg, false_floydsteinberg, sierra, sierra_lite, sierra_two_row, atkinson, burkes, stucki, jarvis_judice_ninke, bayer_2x2, bayer_4x4, bayer_8x8, clustered_dot_4x4, checkered_small, checkered_medium, checkered_large, stevenson_arce, knoll, lattice_boltzmann
 
 
 class DitherMe:
@@ -36,15 +36,15 @@ class DitherMe:
             "Burkes": burkes,
             "Stucki": stucki,
             "Jarvis-Judice & Ninke": jarvis_judice_ninke,
-            # "Stevenson-Arce": ,
-            # "Knoll": ,
+            "Stevenson-Arce": stevenson_arce,
+            "Knoll": knoll,
 
             # # Ordered Dithering
             "Bayer 2x2": bayer_2x2,
             "Bayer 4x4": bayer_4x4,
             "Bayer 8x8": bayer_8x8,
             "Clustered Dot 4x4": clustered_dot_4x4,
-            # "Lattice-Boltzmann": ,
+            "Lattice-Boltzmann": lattice_boltzmann,
 
             # Noise-Based Dithering
             # "Random": ,

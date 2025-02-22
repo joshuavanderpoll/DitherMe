@@ -1,0 +1,87 @@
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <png.h>
+#include "image_utils.h"
+
+void stevenson_arce_dither(uint8_t *image, unsigned width, unsigned height, unsigned channels) {
+    // Stevenson-Arce diffusion matrix
+    int8_t sa_matrix[12][2] = {
+        {2, 0}, {3, 0}, {-2, 1}, {1, 1}, {-3, 2}, {-1, 2},
+        {1, 2}, {3, 2}, {-2, 3}, {1, 3}, {0, 4}, {2, 4}
+    };
+
+    float sa_weights[12] = {32.0 / 200, 12.0 / 200, 12.0 / 200, 26.0 / 200,
+                             12.0 / 200, 26.0 / 200, 12.0 / 200, 12.0 / 200,
+                             12.0 / 200, 26.0 / 200, 12.0 / 200, 12.0 / 200};
+
+    for (unsigned y = 0; y < height; y++) {
+        for (unsigned x = 0; x < width; x++) {
+            for (unsigned c = 0; c < channels; c++) {
+                uint8_t *pixel = &image[(y * width + x) * channels + c];
+                int old_pixel = *pixel;
+                int new_pixel = old_pixel < 128 ? 0 : 255;
+                *pixel = new_pixel;
+                int quant_error = old_pixel - new_pixel;
+
+                for (int i = 0; i < 12; i++) {
+                    int nx = x + sa_matrix[i][0];
+                    int ny = y + sa_matrix[i][1];
+
+                    if (nx >= 0 && nx < (int)width && ny >= 0 && ny < (int)height) {
+                        uint8_t *neighbor = &image[(ny * width + nx) * channels + c];
+                        *neighbor = (uint8_t)fmax(0, fmin(255, *neighbor + quant_error * sa_weights[i]));
+                    }
+                }
+            }
+        }
+    }
+}
+
+static PyObject *dither_stevenson_arce(PyObject *self, PyObject *args) {
+    Py_buffer input_buffer;
+    if (!PyArg_ParseTuple(args, "y*", &input_buffer)) {
+        return NULL;
+    }
+
+    unsigned width, height;
+    uint8_t *image_data = decode_png((uint8_t *)input_buffer.buf, input_buffer.len, &width, &height);
+    if (!image_data) {
+        PyErr_SetString(PyExc_RuntimeError, "Failed to decode PNG");
+        return NULL;
+    }
+
+    stevenson_arce_dither(image_data, width, height, 4);
+
+    size_t output_size;
+    uint8_t *output_data = encode_png(image_data, width, height, &output_size);
+    free(image_data);
+
+    if (!output_data) {
+        PyErr_SetString(PyExc_RuntimeError, "Failed to encode PNG");
+        return NULL;
+    }
+
+    PyObject *result = PyBytes_FromStringAndSize((char *)output_data, output_size);
+    free(output_data);
+    return result;
+}
+
+static PyMethodDef StevensonArceMethods[] = {
+    {"dither", dither_stevenson_arce, METH_VARARGS, "Apply Stevenson-Arce dithering to a PNG image."},
+    {NULL, NULL, 0, NULL}
+};
+
+static struct PyModuleDef stevenson_arce_module = {
+    PyModuleDef_HEAD_INIT,
+    "stevenson_arce",
+    "Module for applying Stevenson-Arce dithering to PNG images.",
+    -1,
+    StevensonArceMethods
+};
+
+PyMODINIT_FUNC PyInit_stevenson_arce(void) {
+    return PyModule_Create(&stevenson_arce_module);
+}
