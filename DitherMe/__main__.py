@@ -88,6 +88,11 @@ class DitherMe:
             "blur": 0, "pixelation": 1, "noise": 0
         }
 
+        # Greyscale Checkbox
+        self.is_greyscale = tk.BooleanVar(value=True)  # Default is checked (True)
+        self.greyscale_checkbox = tk.Checkbutton(self.frame_right, text="Greyscale", variable=self.is_greyscale, bg="#2A2B35", fg="white", selectcolor="#2A2B35", command=self.update_image)
+        self.greyscale_checkbox.pack(pady=5, padx=10, anchor="w")
+
         # Sliders
         self.add_slider("Scale (%)", "scale", 1, 100, 100, self.update_image, True)
         self.add_slider("Contrast", "contrast", 0.5, 3.0, 1.0, self.update_image, 0.1)
@@ -300,41 +305,44 @@ class DitherMe:
 
         # Resize image
         new_size = (max(1, int(img.width * scale_factor)), max(1, int(img.height * scale_factor)))
-        img_rgb = img_rgb.resize(new_size, Image.LANCZOS)
+        img_resized = img_rgb.resize(new_size, Image.LANCZOS)
 
         # Convert to grayscale for dithering
-        img_gray = img_rgb.convert("L")
+        if self.is_greyscale.get():
+            img_converted = img_resized.convert("L")
+        else:
+            img_converted = img_resized
 
         # Apply contrast adjustment
         contrast_factor = self.sliders["contrast"].get_value()
-        img_gray = ImageEnhance.Contrast(img_gray).enhance(contrast_factor)
+        img_converted = ImageEnhance.Contrast(img_converted).enhance(contrast_factor)
 
         # Apply midtones and highlights correction
         midtone_factor = self.sliders["midtones"].get_value()
         highlight_factor = self.sliders["highlights"].get_value()
 
-        np_img = np.array(img_gray, dtype=np.float32) / 255.0
+        np_img = np.array(img_converted, dtype=np.float32) / 255.0
         np_img = np_img ** (1 / midtone_factor)  # Adjust midtones
         np_img = np.clip(np_img * highlight_factor, 0, 1)  # Adjust highlights
-        img_gray = Image.fromarray((np_img * 255).astype(np.uint8))
+        img_converted = Image.fromarray((np_img * 255).astype(np.uint8))
 
         # Apply blur
         blur_amount = self.sliders["blur"].get_value()
         if blur_amount > 0:
-            img_gray = img_gray.filter(ImageFilter.GaussianBlur(blur_amount))
+            img_converted = img_converted.filter(ImageFilter.GaussianBlur(blur_amount))
 
         # Apply pixelation
         pixelation_factor = self.sliders["pixelation"].get_value()
         if pixelation_factor > 1:
-            img_gray = img_gray.resize((img_gray.width // pixelation_factor, img_gray.height // pixelation_factor), Image.NEAREST)
-            img_gray = img_gray.resize((img_gray.width * pixelation_factor, img_gray.height * pixelation_factor), Image.NEAREST)
+            img_converted = img_converted.resize((img_converted.width // pixelation_factor, img_converted.height // pixelation_factor), Image.NEAREST)
+            img_converted = img_converted.resize((img_converted.width * pixelation_factor, img_converted.height * pixelation_factor), Image.NEAREST)
 
         # Apply noise
-        img_gray = self.apply_noise(img_gray)
+        img_converted = self.apply_noise(img_converted)
 
         # Convert image to bytes
         img_byte_arr = io.BytesIO()
-        img_gray.save(img_byte_arr, format="PNG")
+        img_converted.save(img_byte_arr, format="PNG")
         img_bytes = img_byte_arr.getvalue()
 
         # Apply dithering
