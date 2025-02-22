@@ -5,9 +5,9 @@ import os
 import io
 import sys
 import tkinter as tk
-from tkinter import filedialog  #, colorchooser
+from tkinter import filedialog, colorchooser
 import mimetypes
-from PIL import Image, ImageTk, ImageEnhance, ImageFilter, ImageSequence, ImageDraw  #, ImageColor
+from PIL import Image, ImageTk, ImageEnhance, ImageFilter, ImageSequence, ImageDraw, ImageColor
 import numpy as np
 
 from ui.slider import Slider
@@ -102,21 +102,21 @@ class DitherMe:
         self.add_slider("Pixelation", "pixelation", 1, 20, 1, self.update_image)
         self.add_slider("Noise", "noise", 0, 100, 0, self.update_image)
 
-        # # Foreground and Background color initialization
-        # self.selected_foreground = "#FFFFFF"  # Default to white
-        # self.selected_background = "#000000"  # Default to black
+        # Foreground and Background color initialization
+        self.selected_foreground = "#FFFFFF"  # Default to white
+        self.selected_background = "#000000"  # Default to black
 
-        # # Foreground color picker
-        # self.foreground_btn = Button(self.frame_right, "Select Foreground Color", command=self.pick_foreground, color_preview=True)
-        # self.foreground_btn.update_preview_color(self.selected_foreground)
-        # self.foreground_btn.pack(pady=5, padx=10)
-        # self.add_slider("Foreground Opacity", "foreground_opacity", 0, 255, 255, self.update_image)
+        # Foreground color picker
+        self.foreground_btn = Button(self.frame_right, "Select Foreground Color", command=self.pick_foreground, color_preview=True)
+        self.foreground_btn.update_preview_color(self.selected_foreground)
+        self.foreground_btn.pack(pady=5, padx=10)
+        self.add_slider("Foreground Opacity", "foreground_opacity", 0, 255, 255, self.update_image)
 
-        # # Background color picker
-        # self.background_btn = Button(self.frame_right, "Select Background Color", command=self.pick_background, color_preview=True)
-        # self.background_btn.update_preview_color(self.selected_background)
-        # self.background_btn.pack(pady=5, padx=10)
-        # self.add_slider("Background Opacity", "background_opacity", 0, 255, 255, self.update_image)
+        # Background color picker
+        self.background_btn = Button(self.frame_right, "Select Background Color", command=self.pick_background, color_preview=True)
+        self.background_btn.update_preview_color(self.selected_background)
+        self.background_btn.pack(pady=5, padx=10)
+        self.add_slider("Background Opacity", "background_opacity", 0, 255, 255, self.update_image)
 
         # Reset Options Button
         self.reset_btn = Button(self.frame_right, "Reset Options", command=self.reset_options)
@@ -176,24 +176,24 @@ class DitherMe:
         self.sliders[key] = slider
 
 
-    # def pick_foreground(self):
-    #     """ Open color picker for foreground color. """
+    def pick_foreground(self):
+        """ Open color picker for foreground color. """
 
-    #     color_code = colorchooser.askcolor(title="Choose Foreground Color")[1]
-    #     if color_code:
-    #         self.selected_foreground = color_code
-    #         self.foreground_btn.update_preview_color(color_code)
-    #         self.update_image()
+        color_code = colorchooser.askcolor(title="Choose Foreground Color")[1]
+        if color_code:
+            self.selected_foreground = color_code
+            self.foreground_btn.update_preview_color(color_code)
+            self.update_image()
 
 
-    # def pick_background(self):
-    #     """ Open color picker for background color. """
+    def pick_background(self):
+        """ Open color picker for background color. """
 
-    #     color_code = colorchooser.askcolor(title="Choose Background Color")[1]
-    #     if color_code:
-    #         self.selected_background = color_code
-    #         self.background_btn.update_preview_color(color_code)
-    #         self.update_image()
+        color_code = colorchooser.askcolor(title="Choose Background Color")[1]
+        if color_code:
+            self.selected_background = color_code
+            self.background_btn.update_preview_color(color_code)
+            self.update_image()
 
 
     def reset_options(self):
@@ -202,10 +202,10 @@ class DitherMe:
         for key, value in self.default_values.items():
             self.sliders[key].set_value(value)
 
-        # self.selected_foreground = "#FFFFFF"
-        # self.selected_background = "#000000"
-        # self.foreground_btn.update_preview_color(self.selected_foreground)
-        # self.background_btn.update_preview_color(self.selected_background)
+        self.selected_foreground = "#FFFFFF"
+        self.selected_background = "#000000"
+        self.foreground_btn.update_preview_color(self.selected_foreground)
+        self.background_btn.update_preview_color(self.selected_background)
 
         self.update_image()
 
@@ -295,7 +295,7 @@ class DitherMe:
 
 
     def process_frame(self, img):
-        """ Process an image frame without transparency support."""
+        """ Process an image frame """
 
         # Ensure image is in RGB mode
         img_rgb = img.convert("RGB")
@@ -307,7 +307,7 @@ class DitherMe:
         new_size = (max(1, int(img.width * scale_factor)), max(1, int(img.height * scale_factor)))
         img_resized = img_rgb.resize(new_size, Image.LANCZOS)
 
-        # Convert to grayscale for dithering
+        # Convert to grayscale if selected
         if self.is_greyscale.get():
             img_converted = img_resized.convert("L")
         else:
@@ -345,12 +345,33 @@ class DitherMe:
         img_converted.save(img_byte_arr, format="PNG")
         img_bytes = img_byte_arr.getvalue()
 
-        # Apply dithering
+        # Apply dithering algorithm
         dither_algorithm = self.algorithms[self.selected_algorithm.get()]
         dithered_bytes = dither_algorithm.dither(img_bytes)
-        dithered_img = Image.open(io.BytesIO(dithered_bytes)).convert("RGB")
+        dithered_img = Image.open(io.BytesIO(dithered_bytes)).convert("L" if self.is_greyscale.get() else "RGB")
 
-        final_image = dithered_img.resize((self.original_width, self.original_height), Image.NEAREST)
+        # If greyscale mode is enabled, apply foreground/background colors
+        if self.is_greyscale.get():
+            np_dithered = np.array(dithered_img)
+
+            # Get foreground and background colors
+            fg_color = ImageColor.getrgb(self.selected_foreground)
+            bg_color = ImageColor.getrgb(self.selected_background)
+
+            # Convert to color based on brightness threshold
+            threshold = 128  # Midpoint between black and white
+            np_colored = np.zeros((*np_dithered.shape, 3), dtype=np.uint8)
+            np_colored[np_dithered < threshold] = bg_color  # Dark pixels -> Background
+            np_colored[np_dithered >= threshold] = fg_color  # Light pixels -> Foreground
+
+            # Convert back to PIL image
+            final_image = Image.fromarray(np_colored)
+        else:
+            # Keep dithered image as is if not in greyscale mode
+            final_image = dithered_img
+
+        # Resize to original size for display
+        final_image = final_image.resize((self.original_width, self.original_height), Image.NEAREST)
 
         return final_image
 
