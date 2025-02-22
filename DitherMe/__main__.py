@@ -22,7 +22,7 @@ class DitherMe:
     def __init__(self, main_root, startup_file=None):
         self.root = main_root
         self.root.title("DitherMe")
-        self.root.geometry("1110x750")
+        self.root.geometry("1110x775")
         self.root.configure(bg="#1A1A23")
 
         self.algorithms = {
@@ -229,7 +229,12 @@ class DitherMe:
             if self.is_gif:
                 self.gif_durations = [frame.info.get("duration", 100) for frame in ImageSequence.Iterator(self.image)]
                 self.gif_frames = [frame.convert("RGBA") for frame in ImageSequence.Iterator(self.image)]
-                self.processed_gif_frames = [self.process_frame(frame) for frame in self.gif_frames]
+                self.processed_gif_frames = [None] * len(self.gif_frames)  # Lazy processing placeholder
+
+                # Process only a few frames at first
+                for i in range(min(self.preprocessed_frames, len(self.gif_frames))):
+                    self.processed_gif_frames[i] = self.process_frame(self.gif_frames[i])
+
             else:
                 self.image = self.image.convert("RGBA")
                 self.processed_image = self.image.copy()
@@ -427,11 +432,15 @@ class DitherMe:
         """ Animate the GIF frames """
 
         if self.playing and self.is_gif:
-            if self.current_frame_index >= len(self.processed_gif_frames):
+            if self.current_frame_index >= len(self.gif_frames):
                 self.current_frame_index = 0
 
+            # Process the frame lazily if it hasn't been processed yet
+            if self.processed_gif_frames[self.current_frame_index] is None:
+                self.processed_gif_frames[self.current_frame_index] = self.process_frame(self.gif_frames[self.current_frame_index])
+
             self.display_image(self.processed_gif_frames[self.current_frame_index])
-            self.current_frame_index = (self.current_frame_index + 1) % len(self.processed_gif_frames)
+            self.current_frame_index = (self.current_frame_index + 1) % len(self.gif_frames)
 
             frame_duration = self.gif_durations[self.current_frame_index]
             self.root.after(frame_duration, self.animate)
@@ -448,23 +457,19 @@ class DitherMe:
 
         if file_path:
             if self.is_gif:
-                # Set up progress bar
+                # Process remaining frames before exporting
                 total_frames = len(self.gif_frames)
                 self.progress_bar.set_progress(0)
 
-                processed_frames = []
-                for i, frame in enumerate(self.gif_frames):
-                    if self.processed_gif_frames[self.gif_frames.index(frame)] is None:
-                        processed_frame = self.process_frame(frame)
-                        self.processed_gif_frames[self.gif_frames.index(frame)] = processed_frame
-                    processed_frames.append(self.processed_gif_frames[self.gif_frames.index(frame)])
+                for i in range(total_frames):
+                    if self.processed_gif_frames[i] is None:
+                        self.processed_gif_frames[i] = self.process_frame(self.gif_frames[i])
 
                     # Update progress bar
                     self.progress_bar.set_progress((i + 1) / total_frames)
                     self.root.update()
 
-                # Convert processed GIF frames to mode 'P' (palette-based) to preserve transparency
-                processed_frames = [frame.convert("RGBA") for frame in processed_frames if frame is not None]
+                processed_frames = [frame.convert("RGBA") for frame in self.processed_gif_frames if frame is not None]
 
                 if processed_frames:  # Check if we have any frames to save
                     processed_frames[0].save(
@@ -483,7 +488,6 @@ class DitherMe:
                 else:
                     tk.messagebox.showerror("Export Error", "No frames available to export.")
             else:
-                # For single image, we can just show a brief progress
                 self.progress_bar.set_progress(1)
                 self.root.update()
                 self.processed_image.save(file_path, format="PNG")
