@@ -2,17 +2,18 @@
 # pylint: disable=line-too-long, unused-argument, no-member
 
 import os
+import io
 import sys
 import tkinter as tk
-from tkinter import filedialog, colorchooser
+from tkinter import filedialog  #, colorchooser
 import mimetypes
-from PIL import Image, ImageTk, ImageColor, ImageEnhance, ImageFilter, ImageSequence, ImageDraw
+from PIL import Image, ImageTk, ImageEnhance, ImageFilter, ImageSequence, ImageDraw  #, ImageColor
 import numpy as np
 
 from ui.slider import Slider
 from ui.button import Button
 from ui.progress_bar import ProgressBar
-import algorithms
+from DitherMe.algorithms import floydsteinberg, false_floydsteinberg, sierra, sierra_lite, sierra_two_row, atkinson, burkes, stucki, jarvis_judice_ninke, bayer_2x2, bayer_4x4, bayer_8x8, clustered_dot_4x4, checkered_small, checkered_medium, checkered_large
 
 
 class DitherMe:
@@ -26,40 +27,40 @@ class DitherMe:
 
         self.algorithms = {
             # Error Diffusion Dithering
-            "Floyd-Steinberg": algorithms.FloydSteinberg(),
-            "False Floyd-Steinberg": algorithms.FalseFloydSteinberg(),
-            "Sierra": algorithms.Sierra(),
-            "Two-Row Sierra": algorithms.TwoRowSierra(),
-            "Sierra Lite": algorithms.SierraLite(),
-            "Atkinson": algorithms.Atkinson(),
-            "Jarvis, Judice & Ninke": algorithms.JarvisJudiceNinke(),
-            "Stucki": algorithms.Stucki(),
-            "Burkes": algorithms.Burkes(),
-            "Stevenson-Arce": algorithms.StevensonArce(),
-            "Knoll": algorithms.Knoll(),
+            "Floyd-Steinberg": floydsteinberg,
+            "False Floyd-Steinberg": false_floydsteinberg,
+            "Sierra": sierra,
+            "Sierra Lite": sierra_lite,
+            "Sierra Two-Row": sierra_two_row,
+            "Atkinson": atkinson,
+            "Burkes": burkes,
+            "Stucki": stucki,
+            "Jarvis-Judice & Ninke": jarvis_judice_ninke,
+            # "Stevenson-Arce": ,
+            # "Knoll": ,
 
-            # Ordered Dithering
-            "Lattice-Boltzmann": algorithms.LatticeBoltzmann(),
-            "Bayer": algorithms.Bayer(),
-            "Bayer 4x4": algorithms.Bayer4x4(),
-            "Bayer 8x8": algorithms.Bayer8x8(),
-            "Clustered Dot 4x4": algorithms.ClusteredDot4x4(),
+            # # Ordered Dithering
+            "Bayer 2x2": bayer_2x2,
+            "Bayer 4x4": bayer_4x4,
+            "Bayer 8x8": bayer_8x8,
+            "Clustered Dot 4x4": clustered_dot_4x4,
+            # "Lattice-Boltzmann": ,
 
             # Noise-Based Dithering
-            "Random": algorithms.Random(),
-            "Blue Noise": algorithms.BlueNoise(),
-            "Void-and-Cluster": algorithms.VoidAndCluster(),
+            # "Random": ,
+            # "Blue Noise": ,
+            # "Void-and-Cluster": ,
 
-            # Checkered Dithering
-            "Checkers Small": algorithms.CheckersSmall(),
-            "Checkers Medium": algorithms.CheckersMedium(),
-            "Checkers Large": algorithms.CheckersLarge(),
+            # # Checkered Dithering
+            "Checkered Small": checkered_small,
+            "Checkered Medium": checkered_medium,
+            "Checkered Large": checkered_large,
 
             # Artistic Dithering
-            "Radial Burst": algorithms.RadialBurst(),
-            "Vortex": algorithms.Vortex(),
-            "Diamond": algorithms.Diamond(),
-            "Spiral": algorithms.Spiral(),
+            # "Radial Burst": ,
+            # "Vortex": ,
+            # "Diamond": ,
+            # "Spiral": ,
         }
 
         # Sidebar
@@ -96,21 +97,21 @@ class DitherMe:
         self.add_slider("Pixelation", "pixelation", 1, 20, 1, self.update_image)
         self.add_slider("Noise", "noise", 0, 100, 0, self.update_image)
 
-        # Foreground and Background color initialization
-        self.selected_foreground = "#FFFFFF"  # Default to white
-        self.selected_background = "#000000"  # Default to black
+        # # Foreground and Background color initialization
+        # self.selected_foreground = "#FFFFFF"  # Default to white
+        # self.selected_background = "#000000"  # Default to black
 
-        # Foreground color picker
-        self.foreground_btn = Button(self.frame_right, "Select Foreground Color", command=self.pick_foreground, color_preview=True)
-        self.foreground_btn.update_preview_color(self.selected_foreground)
-        self.foreground_btn.pack(pady=5, padx=10)
-        self.add_slider("Foreground Opacity", "foreground_opacity", 0, 255, 255, self.update_image)
+        # # Foreground color picker
+        # self.foreground_btn = Button(self.frame_right, "Select Foreground Color", command=self.pick_foreground, color_preview=True)
+        # self.foreground_btn.update_preview_color(self.selected_foreground)
+        # self.foreground_btn.pack(pady=5, padx=10)
+        # self.add_slider("Foreground Opacity", "foreground_opacity", 0, 255, 255, self.update_image)
 
-        # Background color picker
-        self.background_btn = Button(self.frame_right, "Select Background Color", command=self.pick_background, color_preview=True)
-        self.background_btn.update_preview_color(self.selected_background)
-        self.background_btn.pack(pady=5, padx=10)
-        self.add_slider("Background Opacity", "background_opacity", 0, 255, 255, self.update_image)
+        # # Background color picker
+        # self.background_btn = Button(self.frame_right, "Select Background Color", command=self.pick_background, color_preview=True)
+        # self.background_btn.update_preview_color(self.selected_background)
+        # self.background_btn.pack(pady=5, padx=10)
+        # self.add_slider("Background Opacity", "background_opacity", 0, 255, 255, self.update_image)
 
         # Reset Options Button
         self.reset_btn = Button(self.frame_right, "Reset Options", command=self.reset_options)
@@ -170,24 +171,24 @@ class DitherMe:
         self.sliders[key] = slider
 
 
-    def pick_foreground(self):
-        """ Open color picker for foreground color. """
+    # def pick_foreground(self):
+    #     """ Open color picker for foreground color. """
 
-        color_code = colorchooser.askcolor(title="Choose Foreground Color")[1]
-        if color_code:
-            self.selected_foreground = color_code
-            self.foreground_btn.update_preview_color(color_code)
-            self.update_image()
+    #     color_code = colorchooser.askcolor(title="Choose Foreground Color")[1]
+    #     if color_code:
+    #         self.selected_foreground = color_code
+    #         self.foreground_btn.update_preview_color(color_code)
+    #         self.update_image()
 
 
-    def pick_background(self):
-        """ Open color picker for background color. """
+    # def pick_background(self):
+    #     """ Open color picker for background color. """
 
-        color_code = colorchooser.askcolor(title="Choose Background Color")[1]
-        if color_code:
-            self.selected_background = color_code
-            self.background_btn.update_preview_color(color_code)
-            self.update_image()
+    #     color_code = colorchooser.askcolor(title="Choose Background Color")[1]
+    #     if color_code:
+    #         self.selected_background = color_code
+    #         self.background_btn.update_preview_color(color_code)
+    #         self.update_image()
 
 
     def reset_options(self):
@@ -196,10 +197,10 @@ class DitherMe:
         for key, value in self.default_values.items():
             self.sliders[key].set_value(value)
 
-        self.selected_foreground = "#FFFFFF"
-        self.selected_background = "#000000"
-        self.foreground_btn.update_preview_color(self.selected_foreground)
-        self.background_btn.update_preview_color(self.selected_background)
+        # self.selected_foreground = "#FFFFFF"
+        # self.selected_background = "#000000"
+        # self.foreground_btn.update_preview_color(self.selected_foreground)
+        # self.background_btn.update_preview_color(self.selected_background)
 
         self.update_image()
 
@@ -289,19 +290,17 @@ class DitherMe:
 
 
     def process_frame(self, img):
-        """ Process an image frame."""
+        """ Process an image frame without transparency support."""
 
-        # Ensure image is in RGBA mode
-        img_rgba = img.convert("RGBA")
-        img_rgb, img_alpha = img_rgba.convert("RGB"), img_rgba.getchannel("A")
+        # Ensure image is in RGB mode
+        img_rgb = img.convert("RGB")
 
         # Get scale factor (percent-based)
         scale_factor = self.sliders["scale"].get_value() / 100.0
 
-        # Resize RGB and Alpha channels separately
+        # Resize image
         new_size = (max(1, int(img.width * scale_factor)), max(1, int(img.height * scale_factor)))
         img_rgb = img_rgb.resize(new_size, Image.LANCZOS)
-        img_alpha = img_alpha.resize(new_size, Image.LANCZOS)
 
         # Convert to grayscale for dithering
         img_gray = img_rgb.convert("L")
@@ -333,44 +332,17 @@ class DitherMe:
         # Apply noise
         img_gray = self.apply_noise(img_gray)
 
+        # Convert image to bytes
+        img_byte_arr = io.BytesIO()
+        img_gray.save(img_byte_arr, format="PNG")
+        img_bytes = img_byte_arr.getvalue()
+
         # Apply dithering
         dither_algorithm = self.algorithms[self.selected_algorithm.get()]
-        dithered_img = dither_algorithm.apply_dither(img_gray)
-        dithered_img = dithered_img.convert("RGBA")
+        dithered_bytes = dither_algorithm.dither(img_bytes)
+        dithered_img = Image.open(io.BytesIO(dithered_bytes)).convert("RGB")
 
-        # Get user-selected colors and opacity
-        fg_color = np.array(ImageColor.getrgb(self.selected_foreground), dtype=np.uint8)
-        bg_color = np.array(ImageColor.getrgb(self.selected_background), dtype=np.uint8)
-
-        fg_opacity = self.sliders["foreground_opacity"].get_value() / 255.0  # Convert to range [0,1]
-        bg_opacity = self.sliders["background_opacity"].get_value() / 255.0  # Convert to range [0,1]
-
-        # Convert image to NumPy array
-        dithered_pixels = np.array(dithered_img, dtype=np.uint8)
-        alpha_pixels = np.array(img_alpha.resize((dithered_pixels.shape[1], dithered_pixels.shape[0]), Image.LANCZOS), dtype=np.uint8)
-
-        # Create a mask for dithering (white -> foreground, black -> background)
-        mask = (dithered_pixels[:, :, 0] > 128).astype(np.float32)  # White pixels (foreground)
-
-        # Compute final blended color while preserving transparency
-        blended_pixels = np.zeros_like(dithered_pixels, dtype=np.uint8)
-
-        for i in range(3):  # Apply to R, G, B channels
-            blended_pixels[:, :, i] = (
-                mask * ((1 - fg_opacity) * dithered_pixels[:, :, i] + fg_opacity * fg_color[i]) +
-                (1 - mask) * ((1 - bg_opacity) * dithered_pixels[:, :, i] + bg_opacity * bg_color[i])
-            ).astype(np.uint8)
-
-        # **Apply alpha blending to transparency**
-        blended_pixels[:, :, 3] = (alpha_pixels * (
-            mask * fg_opacity + (1 - mask) * bg_opacity
-        )).astype(np.uint8)  # Preserve original transparency while respecting opacity
-
-        # Convert back to Image
-        final_image = Image.fromarray(blended_pixels, "RGBA")
-
-        # Resize back to original size
-        final_image = final_image.resize((self.original_width, self.original_height), Image.NEAREST)
+        final_image = dithered_img.resize((self.original_width, self.original_height), Image.NEAREST)
 
         return final_image
 

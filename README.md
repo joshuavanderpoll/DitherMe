@@ -61,22 +61,46 @@ If you prefer to run the Python source code, follow the steps below:
 
 #### iOS
 ```bash
+# Install repository
 git clone https://github.com/joshuavanderpoll/DitherMe.git
 cd DitherMe
+
+# Setup Python environment
 python3 -m venv .venv
 source .venv/bin/activate
 pip3 install -r requirements.txt
+
+# Install PNG Lib
+make clean
+make 
+
+# Compile and install all Dithering algorithms
+python setup.py clean --all
+pip install -e .
+
 python3 DitherMe
 ```
 
 #### Windows
 ```bash
+# Install repository
 git clone https://github.com/joshuavanderpoll/DitherMe.git
 cd DitherMe
-python -m venv .venv 
+
+# Setup Python environment
+python -m venv .venv
 .venv\Scripts\activate
-pip3 install -r requirements.txt
-python3 DitherMe
+pip install -r requirements.txt
+
+# Install PNG Lib
+make clean
+make
+
+# Compile and install all Dithering algorithms
+python setup.py clean --all
+pip install -e .
+
+python DitherMe
 ```
 
 ## 🖼 Preview
