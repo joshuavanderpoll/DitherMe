@@ -358,14 +358,19 @@ class DitherMe:
             fg_color = ImageColor.getrgb(self.selected_foreground)
             bg_color = ImageColor.getrgb(self.selected_background)
 
-            # Convert to color based on brightness threshold
-            threshold = 128  # Midpoint between black and white
-            np_colored = np.zeros((*np_dithered.shape, 3), dtype=np.uint8)
-            np_colored[np_dithered < threshold] = bg_color  # Dark pixels -> Background
-            np_colored[np_dithered >= threshold] = fg_color  # Light pixels -> Foreground
+            # Get opacity values (0-255)
+            fg_opacity = self.sliders["foreground_opacity"].get_value() / 255.0
+            bg_opacity = self.sliders["background_opacity"].get_value() / 255.0
+
+            # Convert to RGBA
+            np_colored = np.zeros((*np_dithered.shape, 4), dtype=np.uint8)  # 4 channels (RGBA)
+
+            # Apply colors with opacity blending
+            np_colored[np_dithered < 128] = [*bg_color, int(bg_opacity * 255)]  # Dark pixels -> Background
+            np_colored[np_dithered >= 128] = [*fg_color, int(fg_opacity * 255)]  # Light pixels -> Foreground
 
             # Convert back to PIL image
-            final_image = Image.fromarray(np_colored)
+            final_image = Image.fromarray(np_colored, mode="RGBA")
         else:
             # Keep dithered image as is if not in greyscale mode
             final_image = dithered_img
