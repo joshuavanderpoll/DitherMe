@@ -37,15 +37,16 @@ jobs:
 
       - name: Install System Dependencies (Windows)
         if: matrix.os == 'windows-latest'
+        shell: cmd
         run: |
           choco install mingw --allow-empty-checksums -y
           refreshenv
-          C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\pacman.exe -S mingw-w64-x86_64-libpng --noconfirm
+          "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\pacman.exe" -S mingw-w64-x86_64-libpng --noconfirm
 
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip setuptools pyinstaller
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if exist requirements.txt pip install -r requirements.txt
 
       - name: Build PNG Library
         run: |
@@ -61,8 +62,8 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           pyinstaller --clean --windowed --onefile --name "DitherMe" --icon="assets/icon.ico" DitherMe/__main__.py
-          mkdir -p dist/windows
-          mv dist/DitherMe.exe dist/windows/DitherMe.exe
+          mkdir dist\windows 2>nul || echo Folder exists
+          move dist\DitherMe.exe dist\windows\DitherMe.exe
 
       - name: Build Application (macOS)
         if: matrix.os == 'macos-latest'
