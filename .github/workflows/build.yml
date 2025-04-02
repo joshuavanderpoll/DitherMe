@@ -59,6 +59,7 @@ jobs:
           if exist requirements.txt pip install -r requirements.txt
 
       - name: Build PNG Library
+        if: matrix.os != 'windows-latest'
         run: |
           make clean
           make
