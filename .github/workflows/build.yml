@@ -28,7 +28,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt update
-          sudo apt install python3.10-tk python3.10-dev libpng-dev build-essential -y
+          sudo apt install python3-tk python3-dev libpng-dev build-essential -y
 
       - name: Install System Dependencies (macOS)
         if: matrix.os == 'macos-latest'
