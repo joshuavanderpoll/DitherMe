@@ -13,38 +13,46 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [macos-latest, windows-latest, ubuntu-latest]
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Install Python
+      - name: Setup Python Environment
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Cache Python Dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install Dependencies
+      - name: Install System Dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          sudo apt update
+          sudo apt install python3.10-tk python3.10-dev libpng-dev build-essential -y
 
-      - name: Cache PyInstaller Build Files
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.pyinstaller
-            build
-          key: ${{ runner.os }}-pyinstaller-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-pyinstaller-
+      - name: Install System Dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install libpng
+
+      - name: Install System Dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install python-tk libpng mingw --allow-empty-checksums
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools pyinstaller
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Build PNG Library
+        run: |
+          make clean
+          make
+
+      - name: Compile and Install Dithering Algorithms
+        run: |
+          python setup.py clean --all
+          pip install -e .
 
       - name: Build Application (Windows)
         if: matrix.os == 'windows-latest'
@@ -60,13 +68,20 @@ jobs:
           mkdir -p dist/macos
           mv dist/DitherMe.app dist/macos/DitherMe.app
 
+      - name: Build Application (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          pyinstaller --clean --onefile --name "DitherMe" DitherMe/__main__.py
+          mkdir -p dist/ubuntu
+          mv dist/DitherMe dist/ubuntu/DitherMe
+
       - name: Upload Artifact (Windows)
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
           name: DitherMe-Windows
           path: dist/windows/DitherMe.exe
-          
+
       - name: Create DMG
         if: matrix.os == 'macos-latest'
         run: |
@@ -79,6 +94,13 @@ jobs:
         with:
           name: DitherMe-OSX
           path: dist/dmg/DitherMe.dmg
+
+      - name: Upload Artifact (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: DitherMe-Ubuntu
+          path: dist/ubuntu/DitherMe
 
   upload:
     name: Upload Release Assets
@@ -96,5 +118,6 @@ jobs:
           files: |
             dist/DitherMe-OSX/DitherMe.dmg
             dist/DitherMe-Windows/DitherMe.exe
+            dist/DitherMe-Ubuntu/DitherMe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
