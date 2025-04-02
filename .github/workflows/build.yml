@@ -38,7 +38,9 @@ jobs:
       - name: Install System Dependencies (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          choco install python-tk libpng mingw --allow-empty-checksums
+          choco install mingw --allow-empty-checksums -y
+          refreshenv
+          C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\pacman.exe -S mingw-w64-x86_64-libpng --noconfirm
 
       - name: Install Python Dependencies
         run: |
@@ -76,6 +78,12 @@ jobs:
           mkdir -p dist/ubuntu
           mv dist/DitherMe dist/ubuntu/DitherMe
 
+      - name: Create DMG (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          mkdir -p dist/dmg
+          hdiutil create -volname "DitherMe" -srcfolder dist/macos/DitherMe.app -ov -format UDZO dist/dmg/DitherMe.dmg
+
       - name: Upload Artifact (Windows)
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
@@ -83,13 +91,7 @@ jobs:
           name: DitherMe-Windows
           path: dist/windows/DitherMe.exe
 
-      - name: Create DMG
-        if: matrix.os == 'macos-latest'
-        run: |
-          mkdir -p dist/dmg
-          hdiutil create -volname "DitherMe" -srcfolder dist/macos/DitherMe.app -ov -format UDZO dist/dmg/DitherMe.dmg
-
-      - name: Upload DMG Artifact
+      - name: Upload DMG Artifact (macOS)
         if: matrix.os == 'macos-latest'
         uses: actions/upload-artifact@v4
         with:
