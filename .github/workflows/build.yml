@@ -50,16 +50,11 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: cmd
         run: |
-          dir %VCPKG_ROOT%\installed\x64-windows\include
-          dir %VCPKG_ROOT%\installed\x64-windows\lib
-          
-      - name: Install Python Dependencies (Linux/macOS)
-        if: matrix.os != 'windows-latest'
-        run: |
-          python3 -m pip install --upgrade pip setuptools pyinstaller
-          if [ -f requirements.txt ]; then
-            python3 -m pip install -r requirements.txt
-          fi
+          echo VCPKG_ROOT=%VCPKG_ROOT%
+          dir "%VCPKG_ROOT%\installed\x64-windows\include" || echo "Include directory not found"
+          dir "%VCPKG_ROOT%\installed\x64-windows\lib" || echo "Lib directory not found"
+          dir "%VCPKG_ROOT%\installed\x64-windows\include" | findstr /i "png.h" || echo "png.h not found"
+          dir "%VCPKG_ROOT%\installed\x64-windows\lib" | findstr /i "libpng16.lib" || echo "libpng16.lib not found"
 
       - name: Install Python Dependencies (Windows)
         if: matrix.os == 'windows-latest'
@@ -67,6 +62,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools pyinstaller
           if exist requirements.txt pip install -r requirements.txt
+                
+      - name: Install Python Dependencies (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        run: |
+          python3 -m pip install --upgrade pip setuptools pyinstaller
+          if [ -f requirements.txt ]; then
+            python3 -m pip install -r requirements.txt
+          fi
 
       - name: Build PNG Library
         if: matrix.os != 'windows-latest'
