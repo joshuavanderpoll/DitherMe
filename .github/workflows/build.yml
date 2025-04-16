@@ -14,7 +14,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        os: [macos-latest, windows-latest, ubuntu-20.04]
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -25,7 +25,7 @@ jobs:
           python-version: '3.10'
 
       - name: Install System Dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-20.04'
         run: |
           sudo apt update
           sudo apt install python3-tk python3-dev libpng-dev build-essential -y
@@ -88,7 +88,7 @@ jobs:
           mv dist/DitherMe.app dist/macos/DitherMe.app
 
       - name: Build Application (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-20.04'
         run: |
           pyinstaller --clean --onefile --name "DitherMe" DitherMe/__main__.py
           mkdir -p dist/ubuntu
@@ -115,7 +115,7 @@ jobs:
           path: dist/dmg/DitherMe.dmg
 
       - name: Upload Artifact (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-20.04'
         uses: actions/upload-artifact@v4
         with:
           name: DitherMe-Ubuntu
@@ -123,7 +123,7 @@ jobs:
 
   upload:
     name: Upload Release Assets
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: [build]
     if: github.event_name == 'release'
     steps:
