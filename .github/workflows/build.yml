@@ -42,6 +42,8 @@ jobs:
           choco install mingw --allow-empty-checksums -y
           refreshenv
           "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\pacman.exe" -S mingw-w64-x86_64-libpng --noconfirm
+          set "C_INCLUDE_PATH=%C_INCLUDE_PATH%;C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\include"
+          set "LIBRARY_PATH=%LIBRARY_PATH%;C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\lib"
 
       - name: Install Python Dependencies (Linux/macOS)
         if: matrix.os != 'windows-latest'
@@ -64,10 +66,17 @@ jobs:
           make clean
           make
 
-      - name: Compile and Install Dithering Algorithms
+      - name: Compile and Install Dithering Algorithms (Linux/macOS)
+        if: matrix.os != 'windows-latest'
         run: |
           python setup.py clean --all
           pip install -e .
+
+      - name: Compile and Install Dithering Algorithms (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          python setup.py clean --all
+          pip install -e . --global-option=build_ext --global-option="-IC:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\include" --global-option="-LC:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\lib"
 
       - name: Build Application (Windows)
         if: matrix.os == 'windows-latest'
