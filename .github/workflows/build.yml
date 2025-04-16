@@ -39,12 +39,12 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: cmd
         run: |
-          choco install mingw --allow-empty-checksums -y
-          refreshenv
-          "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\pacman.exe" -S mingw-w64-x86_64-libpng --noconfirm
-          set "C_INCLUDE_PATH=%C_INCLUDE_PATH%;C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\include"
-          set "LIBRARY_PATH=%LIBRARY_PATH%;C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\lib"
-
+          git clone https://github.com/microsoft/vcpkg.git
+          cd vcpkg
+          .\bootstrap-vcpkg.bat
+          .\vcpkg.exe install libpng:x64-windows
+          set "VCPKG_ROOT=%CD%"
+          echo "VCPKG_ROOT=%VCPKG_ROOT%" >> %GITHUB_ENV%
       - name: Install Python Dependencies (Linux/macOS)
         if: matrix.os != 'windows-latest'
         run: |
@@ -76,7 +76,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           python setup.py clean --all
-          pip install -e . --global-option=build_ext --global-option="-IC:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\include" --global-option="-LC:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\lib"
+          pip install -e . --config-settings=build_ext="--include-dirs=%VCPKG_ROOT%\installed\x64-windows\include" --config-settings=build_ext="--library-dirs=%VCPKG_ROOT%\installed\x64-windows\lib" --config-settings=build_ext="--libraries=libpng"
 
       - name: Build Application (Windows)
         if: matrix.os == 'windows-latest'
