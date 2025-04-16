@@ -37,24 +37,15 @@ jobs:
 
       - name: Install System Dependencies (Windows)
         if: matrix.os == 'windows-latest'
-        shell: cmd
+        shell: pwsh
         run: |
           git clone https://github.com/microsoft/vcpkg.git
           cd vcpkg
-          .\bootstrap-vcpkg.bat
-          .\vcpkg.exe install libpng:x64-windows
-          set "VCPKG_ROOT=%CD%"
-          echo "VCPKG_ROOT=%VCPKG_ROOT%" >> %GITHUB_ENV%
-
-      - name: Debug vcpkg Installation (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: cmd
-        run: |
-          echo VCPKG_ROOT=%VCPKG_ROOT%
-          dir "%VCPKG_ROOT%\installed\x64-windows\include" || echo "Include directory not found"
-          dir "%VCPKG_ROOT%\installed\x64-windows\lib" || echo "Lib directory not found"
-          dir "%VCPKG_ROOT%\installed\x64-windows\include" | findstr /i "png.h" || echo "png.h not found"
-          dir "%VCPKG_ROOT%\installed\x64-windows\lib" | findstr /i "libpng16.lib" || echo "libpng16.lib not found"
+          ./bootstrap-vcpkg.bat
+          ./vcpkg.exe install libpng:x64-windows --recurse
+          $env:VCPKG_ROOT = $PWD.Path
+          Write-Output "VCPKG_ROOT=$env:VCPKG_ROOT"
+          Write-Output "VCPKG_ROOT=$env:VCPKG_ROOT" >> $env:GITHUB_ENV
 
       - name: Install Python Dependencies (Windows)
         if: matrix.os == 'windows-latest'
