@@ -9,6 +9,7 @@ PROJECT_DIR = os.path.abspath(os.path.dirname(__file__))
 PNG_LIB_PATH = os.path.join(PROJECT_DIR, "png_lib")
 
 # Determine include and library directories
+libraries = []
 vcpkg_root = os.environ.get("VCPKG_ROOT")
 if vcpkg_root and sys.platform == "win32":
     # Windows with vcpkg
@@ -59,7 +60,7 @@ def make_extension(name):
     return Extension(
         f"DitherMe.algorithms.{name}",
         sources=[f"DitherMe/algorithms/{name}.c"] + shared_sources,
-        libraries=["png"],
+        libraries=libraries,
         include_dirs=include_dirs,
         library_dirs=library_dirs,
         extra_compile_args=["-O2"],  # Optimize for performance
@@ -94,7 +95,6 @@ setup(
     classifiers=[
         "Programming Language :: Python",
         "Programming Language :: C",
-        "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
 )
