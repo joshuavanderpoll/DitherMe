@@ -46,6 +46,13 @@ jobs:
           set "VCPKG_ROOT=%CD%"
           echo "VCPKG_ROOT=%VCPKG_ROOT%" >> %GITHUB_ENV%
 
+      - name: Debug vcpkg Installation (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: cmd
+        run: |
+          dir %VCPKG_ROOT%\installed\x64-windows\include
+          dir %VCPKG_ROOT%\installed\x64-windows\lib
+          
       - name: Install Python Dependencies (Linux/macOS)
         if: matrix.os != 'windows-latest'
         run: |
@@ -67,17 +74,18 @@ jobs:
           make clean
           make
 
-      - name: Compile and Install Dithering Algorithms (Linux/macOS)
-        if: matrix.os != 'windows-latest'
-        run: |
-          python setup.py clean --all
-          pip install -e .
-
-      - name: Compile and Install Dithering Algorithms (Windows)
+      - name: Build PNG Library (Windows)
         if: matrix.os == 'windows-latest'
         run: |
+          mkdir build && cd build
+          cmake -S %GITHUB_WORKSPACE%\vcpkg\installed\x64-windows -B . -DCMAKE_INSTALL_PREFIX=%GITHUB_WORKSPACE%\png_lib
+          cmake --build . --target install
+        shell: cmd
+
+      - name: Compile and Install Dithering Algorithms
+        run: |
           python setup.py clean --all
-          pip install -e . --global-option=build_ext --global-option="-I%VCPKG_ROOT%\installed\x64-windows\include" --global-option="-L%VCPKG_ROOT%\installed\x64-windows\lib" --global-option="-lpng"
+          pip install -e . --verbose
 
       - name: Build Application (Windows)
         if: matrix.os == 'windows-latest'
