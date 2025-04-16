@@ -45,6 +45,7 @@ jobs:
           .\vcpkg.exe install libpng:x64-windows
           set "VCPKG_ROOT=%CD%"
           echo "VCPKG_ROOT=%VCPKG_ROOT%" >> %GITHUB_ENV%
+
       - name: Install Python Dependencies (Linux/macOS)
         if: matrix.os != 'windows-latest'
         run: |
@@ -76,7 +77,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           python setup.py clean --all
-          pip install -e . --config-settings=build_ext="--include-dirs=%VCPKG_ROOT%\installed\x64-windows\include" --config-settings=build_ext="--library-dirs=%VCPKG_ROOT%\installed\x64-windows\lib" --config-settings=build_ext="--libraries=libpng"
+          pip install -e . --global-option=build_ext --global-option="-I%VCPKG_ROOT%\installed\x64-windows\include" --global-option="-L%VCPKG_ROOT%\installed\x64-windows\lib" --global-option="-lpng"
 
       - name: Build Application (Windows)
         if: matrix.os == 'windows-latest'
