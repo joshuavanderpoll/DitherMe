@@ -33,7 +33,7 @@ jobs:
       - name: Install System Dependencies (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          brew install libpng python3-tk@3.10
+          brew install libpng
 
       - name: Install System Dependencies (Windows)
         if: matrix.os == 'windows-latest'
