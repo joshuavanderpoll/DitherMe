@@ -97,6 +97,7 @@ class DitherMe:
             activebackground="#22242A",
             activeforeground="white"
         )
+        self.algorithm_dropdown.pack(pady=10, padx=10, fill=tk.X)
 
         # Dictionary to store sliders
         self.sliders = {}
@@ -163,9 +164,11 @@ class DitherMe:
 
         self.play_btn = Button(self.frame_bottom, "Play GIF", command=self.play_gif)
         self.play_btn.pack(side=tk.LEFT, padx=5)
+        self.play_btn.pack_forget()
 
         self.stop_btn = Button(self.frame_bottom, "Stop GIF", command=self.stop_gif)
         self.stop_btn.pack(side=tk.LEFT, padx=5)
+        self.stop_btn.pack_forget()
 
         # Export Button
         self.export_btn = Button(self.frame_right, "Export Image", command=self.export_image)
@@ -268,6 +271,7 @@ class DitherMe:
 
             self.root.title(f"DitherMe - {os.path.basename(file_path)}")
             self.is_gif = mime_type == "image/gif"
+            self.update_gif_controls()
             self.image = Image.open(file_path)
 
             if self.is_gif:
@@ -286,6 +290,18 @@ class DitherMe:
             self.original_width, self.original_height = self.image.size
             self.update_canvas_size()
             self.update_image()
+
+
+    def update_gif_controls(self):
+        """Show or hide GIF controls based on whether the current file is a GIF."""
+        if self.is_gif:
+            if not self.play_btn.winfo_ismapped():
+                self.play_btn.pack(side=tk.LEFT, padx=5)
+                self.stop_btn.pack(side=tk.LEFT, padx=5)
+        else:
+            self.playing = False
+            self.play_btn.pack_forget()
+            self.stop_btn.pack_forget()
 
 
     def update_canvas_size(self):
@@ -454,12 +470,12 @@ class DitherMe:
     def create_checkerboard(self, width, height, box_size=10):
         """ Create a checkerboard pattern as a background. """
 
-        pattern = Image.new("RGB", (width, height), "#BFBFBF")  # Light gray base
+        pattern = Image.new("RGB", (width, height), "#BFBFBF")
 
         draw = ImageDraw.Draw(pattern)
         for y in range(0, height, box_size * 2):
             for x in range(0, width, box_size * 2):
-                draw.rectangle([x, y, x + box_size, y + box_size], fill="#E0E0E0")  # Lighter box
+                draw.rectangle([x, y, x + box_size, y + box_size], fill="#E0E0E0")
                 draw.rectangle([x + box_size, y + box_size, x + box_size * 2, y + box_size * 2], fill="#E0E0E0")
 
         return pattern
