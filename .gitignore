@@ -10,3 +10,4 @@ png_lib/
 *.egg-info/
 *.so
 *.pyd
+*.xml

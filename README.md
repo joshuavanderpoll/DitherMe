@@ -58,7 +58,7 @@ If you prefer to run the Python source code, follow the steps below:
 > [!NOTE]
 > To ensure a clean and isolated environment for the project dependencies, it's recommended to use Python's `venv` module.
 
-#### iOS
+#### OSX/Linux
 ```bash
 # Install repository
 git clone https://github.com/joshuavanderpoll/DitherMe.git
