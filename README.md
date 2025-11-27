@@ -104,7 +104,7 @@ python DitherMe
 
 ## 🖼 Preview
 <p align="center">
-    <img src="assets/github/preview.png" alt="Preview">
+    <img src="assets/github/preview.jpg" alt="Preview">
 </p>
 
 ## 🧙🏻 Dithering Algorithms:
