@@ -786,52 +786,112 @@ class DitherMe:
 
 
     def export_image(self):
-        """ Export the image to a file. """
+        """Export the image or GIF to a file, supporting multiple formats."""
 
         if not self.processed_image and not self.processed_gif_frames:
-            return  # No image to save
+            return
+        
+        if self.is_gif:
+            filetypes = [
+                ("GIF files (*.gif)", "*.gif"),
+                ("PNG files (*.png)", "*.png"),
+            ]
+        else:
+            filetypes = [
+                ("PNG files (*.png)", "*.png"),
+                ("JPEG files (*.jpeg)", "*.jpeg"),
+                ("WebP files (*.webp)", "*.webp"),
+                ("TIFF files (*.tiff)", "*.tiff"),
+                ("BMP files (*.bmp)", "*.bmp"),
+                ("ICO files (*.ico)", "*.ico"),
+            ]
 
-        filetypes = [("PNG files", "*.png"), ("JPEG files", "*.jpg")] if not self.is_gif else [("GIF files", "*.gif"), ("PNG files", "*.png")]
-        file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=filetypes)
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".png",
+            filetypes=filetypes,
+        )
 
-        if file_path:
-            if self.is_gif:
-                # Process remaining frames before exporting
-                total_frames = len(self.gif_frames)
-                self.progress_bar.set_progress(0)
+        if not file_path:
+            return
 
-                for i in range(total_frames):
-                    if self.processed_gif_frames[i] is None:
-                        self.processed_gif_frames[i] = self.process_frame(self.gif_frames[i])
+        if self.is_gif:
+            total_frames = len(self.gif_frames)
+            if total_frames == 0:
+                return
 
-                    # Update progress bar
-                    self.progress_bar.set_progress((i + 1) / total_frames)
-                    self.root.update()
+            self.progress_bar.set_progress(0)
 
-                processed_frames = [frame.convert("RGBA") for frame in self.processed_gif_frames if frame is not None]
+            for i in range(total_frames):
+                if self.processed_gif_frames[i] is None:
+                    self.processed_gif_frames[i] = self.process_frame(self.gif_frames[i])
 
-                if processed_frames:  # Check if we have any frames to save
-                    processed_frames[0].save(
-                        file_path,
-                        save_all=True,
-                        append_images=processed_frames[1:],
-                        loop=0,
-                        duration=self.gif_durations[:len(processed_frames)],  # Match durations to frames
-                        transparency=255,
-                        disposal=2
-                    )
-
-                    # Reset progress bar after export
-                    self.progress_bar.set_progress(0)
-                    tk.messagebox.showinfo("Export Successful", "The GIF has been successfully exported.")
-                else:
-                    tk.messagebox.showerror("Export Error", "No frames available to export.")
-            else:
-                self.progress_bar.set_progress(1)
+                # Update progress bar
+                self.progress_bar.set_progress((i + 1) / total_frames)
                 self.root.update()
-                self.processed_image.save(file_path, format="PNG")
+
+            processed_frames = [frame.convert("RGBA") for frame in self.processed_gif_frames if frame is not None]
+
+            if processed_frames:
+                processed_frames[0].save(
+                    file_path,
+                    save_all=True,
+                    append_images=processed_frames[1:],
+                    loop=0,
+                    duration=self.gif_durations[:len(processed_frames)],
+                    transparency=255,
+                    disposal=2,
+                )
+
                 self.progress_bar.set_progress(0)
-                tk.messagebox.showinfo("Export Successful", "The image has been successfully exported.")
+                tk.messagebox.showinfo("Export Successful", "The GIF has been successfully exported.")
+            else:
+                tk.messagebox.showerror("Export Error", "No frames available to export.")
+
+        else:
+            img_to_save = self.processed_image or self.image
+            if img_to_save is None:
+                return
+
+            ext = os.path.splitext(file_path)[1].lower()
+
+            fmt_map = {
+                ".png": "PNG",
+                ".jpg": "JPEG",
+                ".jpeg": "JPEG",
+                ".webp": "WEBP",
+                ".tif": "TIFF",
+                ".tiff": "TIFF",
+                ".bmp": "BMP",
+                ".ico": "ICO",
+            }
+            fmt = fmt_map.get(ext, "PNG")
+
+            self.progress_bar.set_progress(1)
+            self.root.update()
+
+            try:
+                if fmt == "ICO":
+                    # ICO: must be <= 256x256, Windows-style icon
+                    
+                    ico_img = img_to_save.convert("RGBA")
+                    if ico_img.width > 256 or ico_img.height > 256:
+                        ico_img = ico_img.copy()
+                        ico_img.thumbnail((256, 256), Image.LANCZOS)
+                    ico_img.save(file_path, format="ICO")
+                else:
+                    img_to_save.save(file_path, format=fmt)
+
+                tk.messagebox.showinfo(
+                    "Export Successful",
+                    f"The image has been successfully exported as {fmt}."
+                )
+            except Exception as exc:
+                tk.messagebox.showerror(
+                    "Export Error",
+                    f"Failed to export image:\n{exc}"
+                )
+            finally:
+                self.progress_bar.set_progress(0)
 
 
 if __name__ == "__main__":
