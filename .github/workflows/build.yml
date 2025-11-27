@@ -94,11 +94,18 @@ jobs:
           mkdir -p dist/ubuntu
           mv dist/DitherMe dist/ubuntu/DitherMe
 
+      - name: Prepare DMG Layout (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          mkdir -p dist/dmg_src
+          cp -R "dist/macos/DitherMe.app" "dist/dmg_src/DitherMe.app"
+          ln -s /Applications "dist/dmg_src/Applications"
+
       - name: Create DMG (macOS)
         if: matrix.os == 'macos-latest'
         run: |
           mkdir -p dist/dmg
-          hdiutil create -volname "DitherMe" -srcfolder dist/macos/DitherMe.app -ov -format UDZO dist/dmg/DitherMe.dmg
+          hdiutil create -volname "DitherMe" -srcfolder dist/dmg_src -ov -format UDZO dist/dmg/DitherMe.dmg
 
       - name: Upload Artifact (Windows)
         if: matrix.os == 'windows-latest'
