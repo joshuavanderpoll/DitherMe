@@ -28,6 +28,7 @@ class DitherMe:
         self.root.title("DitherMe")
         self.root.geometry("1110x775")
         self.root.configure(bg=APP_BG)
+        self._build_menubar()
 
         self.image = None
         self.processed_image = None
@@ -182,10 +183,6 @@ class DitherMe:
         self.background_btn.pack(pady=5, padx=10)
         self.add_slider("Background Opacity", "background_opacity", 0, 255, 255, self.update_image)
 
-        # Reset Options Button
-        self.reset_btn = Button(self.frame_right, "Reset Options", command=self.reset_options)
-        self.reset_btn.pack(pady=10, padx=10)
-
         # Container for Image Preview
         self.image_container = tk.Frame(self.frame_left, bg=CONTAINER_BG, relief=tk.RIDGE)
         self.image_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
@@ -246,10 +243,6 @@ class DitherMe:
         self.stop_btn.pack(side=tk.LEFT, padx=5)
         self.stop_btn.pack_forget()
 
-        # Export Button
-        self.export_btn = Button(self.frame_right, "Export Image", command=self.export_image)
-        self.export_btn.pack(pady=10, padx=10)
-
         # Progress Bar
         self.progress_bar = ProgressBar(
             self.frame_right,
@@ -263,6 +256,51 @@ class DitherMe:
 
         if startup_file and os.path.exists(startup_file):
             self.upload_image(startup_file)
+
+
+    def _build_menubar(self):
+        """Create the application menu (File: Upload, Export, Reset)."""
+
+        menubar = tk.Menu(self.root)
+        file_menu = tk.Menu(menubar, tearoff=False)
+
+        # Platform-dependent modifier key label for shortcuts
+        if sys.platform == "darwin":
+            mod_label = "⌘"
+            mod_event = "Command"
+        else:
+            mod_label = "Ctrl"
+            mod_event = "Control"
+
+        # Upload
+        file_menu.add_command(
+            label=f"Upload…\t{mod_label}+O",
+            command=self.upload_image,
+        )
+        # Export
+        file_menu.add_command(
+            label=f"Export…\t{mod_label}+E",
+            command=self.export_image,
+        )
+        file_menu.add_separator()
+        # Reset options
+        file_menu.add_command(
+            label=f"Reset Options\t{mod_label}+R",
+            command=self.reset_options,
+        )
+        file_menu.add_separator()
+        file_menu.add_command(
+            label=f"Quit DitherMe\t{mod_label}+Q",
+            command=self.root.quit,
+        )
+
+        menubar.add_cascade(label="File", menu=file_menu)
+
+        self.root.config(menu=menubar)
+        self.root.bind_all(f"<{mod_event}-o>", lambda e: self.upload_image())
+        self.root.bind_all(f"<{mod_event}-e>", lambda e: self.export_image())
+        self.root.bind_all(f"<{mod_event}-r>", lambda e: self.reset_options())
+        self.root.bind_all(f"<{mod_event}-q>", lambda e: self.root.quit())
 
 
     def add_slider(self, label, key, from_, to, default, command, resolution=1):
