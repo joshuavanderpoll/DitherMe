@@ -56,6 +56,15 @@ class DitherMe:
         self._bg_item_id = None
         self._image_item_id = None
 
+        self.view_mode = tk.StringVar(value="After")
+        self.split_ratio = 0.5
+        self._dragging_divider = False
+        
+        self._display_w = None
+        self._display_h = None
+        self._display_cx = None
+        self._display_cy = None
+
         self.algorithms = {
             # Error Diffusion Dithering
             "Floyd-Steinberg": floydsteinberg,
@@ -205,6 +214,29 @@ class DitherMe:
         # Play/Stop Buttons
         self.frame_bottom = tk.Frame(self.frame_left, bg=CONTAINER_BG)
         self.frame_bottom.pack(pady=10)
+
+        self.view_mode_menu = tk.OptionMenu(
+            self.frame_bottom,
+            self.view_mode,
+            "After",
+            "Split",
+            command=self.on_view_mode_change
+        )
+        self.view_mode_menu.config(
+            bg=CONTAINER_BG,
+            fg="white",
+            activebackground="#22242A",
+            activeforeground="white",
+            highlightthickness=0,
+            relief=tk.FLAT
+        )
+        self.view_mode_menu["menu"].config(
+            bg=CONTAINER_BG,
+            fg="white",
+            activebackground="#22242A",
+            activeforeground="white"
+        )
+        self.view_mode_menu.pack(side=tk.LEFT, padx=5)
 
         self.play_btn = Button(self.frame_bottom, "Play GIF", command=self.play_gif)
         self.play_btn.pack(side=tk.LEFT, padx=5)
@@ -369,6 +401,11 @@ class DitherMe:
 
         return pattern
     
+    
+    def on_view_mode_change(self, *_):
+        """Als de view mode verandert (After/Split), teken direct opnieuw."""
+        self._redraw_current()
+
 
     def on_canvas_resize(self, event):
         """Make checkerboard fill the entire canvas whenever it resizes."""
@@ -406,13 +443,13 @@ class DitherMe:
             for i in range(min(self.preprocessed_frames, len(self.gif_frames))):
                 self.processed_gif_frames[i] = self.process_frame(self.gif_frames[i])
 
-            # Reset to first frame and show it
+            # Reset to first frame
             self.current_frame_index = 0
-            self.display_image(self.processed_gif_frames[0])
+            self._redraw_current()
 
         elif self.image:
             self.processed_image = self.process_frame(self.image)
-            self.display_image(self.processed_image)
+            self._redraw_current()
 
 
     def process_frame(self, img):
@@ -528,12 +565,16 @@ class DitherMe:
         img_resized = img.resize((disp_w, disp_h), Image.LANCZOS)
         img_tk = ImageTk.PhotoImage(img_resized.convert("RGBA"))
 
-
         # Canvas center (we want to keep it centered + pan offset)
         canvas_w = self.canvas_image.winfo_width() or base_w
         canvas_h = self.canvas_image.winfo_height() or base_h
         center_x = canvas_w // 2 + self.pan_x
         center_y = canvas_h // 2 + self.pan_y
+
+        self._display_w = disp_w
+        self._display_h = disp_h
+        self._display_cx = center_x
+        self._display_cy = center_y
 
         if self._image_item_id is None:
             # First time: create the item
@@ -547,17 +588,77 @@ class DitherMe:
         self.canvas_image.image = img_tk
 
 
-    def _redraw_current(self):
-        """Redraw the currently active image or GIF frame (for zoom/resize)."""
+    def _get_current_frames(self):
+        """Return (original_frame, processed_frame) for current still or GIF."""
         if self.is_gif and self.gif_frames:
-            frame = self.processed_gif_frames[self.current_frame_index]
-            if frame is None:
-                frame = self.gif_frames[self.current_frame_index]
-            self.display_image(frame)
-        elif self.processed_image is not None:
-            self.display_image(self.processed_image)
-        elif self.image is not None:
-            self.display_image(self.image)
+            orig = self.gif_frames[self.current_frame_index]
+            proc = self.processed_gif_frames[self.current_frame_index]
+            if proc is None:
+                proc = orig
+        else:
+            orig = self.image
+            proc = self.processed_image if self.processed_image is not None else orig
+        return orig, proc
+
+    def _redraw_current(self):
+        orig, proc = self._get_current_frames()
+        view_img = self.build_view_image(orig, proc)
+        self.display_image(view_img)
+
+
+    def build_view_image(self, orig, proc):
+        """Bouw het beeld op basis van huidige view mode (After/Split)."""
+        if orig is None and proc is None:
+            return None
+
+        if orig is None:
+            orig = proc
+        if proc is None:
+            proc = orig
+
+        orig = orig.convert("RGBA")
+        proc = proc.convert("RGBA")
+
+        W, H = self.original_width, self.original_height
+        orig = orig.resize((W, H), Image.LANCZOS)
+        proc = proc.resize((W, H), Image.LANCZOS)
+
+        mode = self.view_mode.get()
+
+        if mode == "Split":
+            min_ratio = 0.05
+            max_ratio = 0.95
+            self.split_ratio = max(min_ratio, min(max_ratio, self.split_ratio))
+
+            split_x = int(self.split_ratio * W)
+            split_x = max(0, min(W, split_x))
+
+            result = Image.new("RGBA", (W, H))
+
+            if split_x > 0:
+                left = orig.crop((0, 0, split_x, H))
+                result.paste(left, (0, 0))
+
+            if split_x < W:
+                right = proc.crop((split_x, 0, W, H))
+                result.paste(right, (split_x, 0))
+
+            if 0 <= split_x < W:
+                draw = ImageDraw.Draw(result)
+                draw.line([(split_x, 0), (split_x, H)], fill=(255, 0, 0, 255), width=3)
+                r = 6 
+                draw.ellipse(
+                    (split_x - r, 0, split_x + r, 2 * r),
+                    fill=(255, 0, 0, 255)
+                )
+                draw.ellipse(
+                    (split_x - r, H - 2 * r, split_x + r, H),
+                    fill=(255, 0, 0, 255)
+                )
+
+            return result
+
+        return proc
 
 
     def create_checkerboard(self, width, height, box_size=10):
@@ -618,13 +719,37 @@ class DitherMe:
 
 
     def on_pan_start(self, event):
-        """Start panning (left mouse button)."""
+        """Start panning (left mouse button) of divider drag in Split mode."""
         self._drag_start = (event.x, event.y)
+        self._dragging_divider = False
+
+        if self.view_mode.get() == "Split" and self._display_w and self._display_cx is not None:
+            left_edge = self._display_cx - self._display_w / 2
+            divider_x = left_edge + self.split_ratio * self._display_w
+
+            if abs(event.x - divider_x) <= 12:
+                self._dragging_divider = True
 
 
     def on_pan_move(self, event):
-        """Pan while dragging. Only moves the canvas item (no heavy redraw)."""
-        if self._drag_start is None or self._image_item_id is None:
+        """Pan while dragging, of de divider verschuiven in Split mode."""
+        if self._image_item_id is None:
+            return
+
+        if self._dragging_divider and self.view_mode.get() == "Split" and self._display_w and self._display_cx is not None:
+            left_edge = self._display_cx - self._display_w / 2
+            rel_x = event.x - left_edge
+
+            if self._display_w > 0:
+                min_ratio = 0.05
+                max_ratio = 0.95
+                raw_ratio = rel_x / self._display_w
+                self.split_ratio = max(min_ratio, min(max_ratio, raw_ratio))
+                self._redraw_current()
+
+            return
+
+        if self._drag_start is None:
             return
 
         dx = event.x - self._drag_start[0]
@@ -636,8 +761,9 @@ class DitherMe:
 
 
     def on_pan_end(self, event):
-        """End panning."""
+        """End panning of divider drag."""
         self._drag_start = None
+        self._dragging_divider = False
 
 
     def animate(self):
@@ -651,10 +777,11 @@ class DitherMe:
             if self.processed_gif_frames[self.current_frame_index] is None:
                 self.processed_gif_frames[self.current_frame_index] = self.process_frame(self.gif_frames[self.current_frame_index])
 
-            self.display_image(self.processed_gif_frames[self.current_frame_index])
-            self.current_frame_index = (self.current_frame_index + 1) % len(self.gif_frames)
+            self._redraw_current()
 
             frame_duration = self.gif_durations[self.current_frame_index]
+            self.current_frame_index = (self.current_frame_index + 1) % len(self.gif_frames)
+
             self.root.after(frame_duration, self.animate)
 
 
