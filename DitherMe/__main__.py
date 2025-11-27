@@ -29,6 +29,33 @@ class DitherMe:
         self.root.geometry("1110x775")
         self.root.configure(bg=APP_BG)
 
+        self.image = None
+        self.processed_image = None
+        self.is_gif = False
+        self.gif_frames = []
+        self.gif_durations = []
+        self.processed_gif_frames = []
+        self.current_frame_index = 0
+        self.playing = False
+        self.preprocessed_frames = 5
+
+        self.original_width = 200
+        self.original_height = 200
+        self.current_width = 200
+        self.current_height = 200
+
+        self.zoom = 1.0
+        self.min_zoom = 0.25
+        self.max_zoom = 8.0
+        self.pan_x = 0
+        self.pan_y = 0
+        self._drag_start = None
+
+        self.canvas_width = 500
+        self.canvas_height = 500
+        self._bg_item_id = None
+        self._image_item_id = None
+
         self.algorithms = {
             # Error Diffusion Dithering
             "Floyd-Steinberg": floydsteinberg,
@@ -156,7 +183,24 @@ class DitherMe:
 
         # Canvas for main image
         self.canvas_image = tk.Canvas(self.image_container, bg="black", highlightthickness=0)
-        self.canvas_image.pack(expand=True)
+        self.canvas_image.pack(expand=True, fill=tk.BOTH)
+
+        # Resize handler: keep checkerboard full size
+        self.canvas_image.bind("<Configure>", self.on_canvas_resize)
+
+        # Zoom & pan bindings
+        self.canvas_image.bind("<ButtonPress-1>", self.on_pan_start)
+        self.canvas_image.bind("<B1-Motion>", self.on_pan_move)
+        self.canvas_image.bind("<ButtonRelease-1>", self.on_pan_end)
+
+        # Scroll-wheel zoom (Windows/macOS)
+        self.canvas_image.bind("<MouseWheel>", self.on_mouse_wheel)
+        # Scroll-wheel zoom (Linux)
+        self.canvas_image.bind("<Button-4>", self.on_mouse_wheel_linux)
+        self.canvas_image.bind("<Button-5>", self.on_mouse_wheel_linux)
+
+        # Double click to reset view
+        self.canvas_image.bind("<Double-Button-1>", self.reset_view)
 
         # Play/Stop Buttons
         self.frame_bottom = tk.Frame(self.frame_left, bg=CONTAINER_BG)
@@ -182,22 +226,6 @@ class DitherMe:
             fg_color="#2D8BFF",
             border_color=CONTAINER_BG
         )
-
-        # Image attributes
-        self.image = None
-        self.processed_image = None
-        self.is_gif = False
-        self.gif_frames = []
-        self.gif_durations = []
-        self.processed_gif_frames = []
-        self.current_frame_index = 0
-        self.playing = False
-        self.preprocessed_frames = 5
-
-        self.original_width = 200
-        self.original_height = 200
-        self.current_width = 200
-        self.current_height = 200
 
         self.update_canvas_size()
 
@@ -288,6 +316,10 @@ class DitherMe:
                 self.processed_image = self.image.copy()
 
             self.original_width, self.original_height = self.image.size
+            self.zoom = 1.0
+            self.pan_x = 0
+            self.pan_y = 0
+            self._drag_start = None
             self.update_canvas_size()
             self.update_image()
 
@@ -305,7 +337,10 @@ class DitherMe:
 
 
     def update_canvas_size(self):
-        """ Update the canvas size based on the image dimensions. """
+        """ Update the canvas size """
+
+        if not self.original_width or not self.original_height:
+            return
 
         max_width, max_height = 500, 500
         aspect_ratio = self.original_width / self.original_height
@@ -320,16 +355,44 @@ class DitherMe:
         else:
             self.current_width, self.current_height = self.original_width, self.original_height
 
-        # Generate checkerboard background
-        self.checkerboard_bg = self.create_checkerboard(self.current_width, self.current_height)
+
+    def create_checkerboard(self, width, height, box_size=10):
+        """ Create a checkerboard pattern as a background. """
+
+        pattern = Image.new("RGB", (width, height), "#BFBFBF")
+
+        draw = ImageDraw.Draw(pattern)
+        for y in range(0, height, box_size * 2):
+            for x in range(0, width, box_size * 2):
+                draw.rectangle([x, y, x + box_size, y + box_size], fill="#E0E0E0")
+                draw.rectangle([x + box_size, y + box_size, x + box_size * 2, y + box_size * 2], fill="#E0E0E0")
+
+        return pattern
+    
+
+    def on_canvas_resize(self, event):
+        """Make checkerboard fill the entire canvas whenever it resizes."""
+        self.canvas_width = max(1, event.width)
+        self.canvas_height = max(1, event.height)
+
+        # Generate checkerboard at canvas size
+        self.checkerboard_bg = self.create_checkerboard(self.canvas_width, self.canvas_height)
         self.checkerboard_bg_tk = ImageTk.PhotoImage(self.checkerboard_bg)
 
-        # Resize canvas to fit image
-        self.canvas_image.config(width=self.current_width, height=self.current_height)
-        self.canvas_image.pack()
+        if self._bg_item_id is None:
+            # Draw background once, at the very back
+            self._bg_item_id = self.canvas_image.create_image(
+                0, 0,
+                anchor=tk.NW,
+                image=self.checkerboard_bg_tk,
+            )
+        else:
+            # Update existing background image
+            self.canvas_image.itemconfig(self._bg_item_id, image=self.checkerboard_bg_tk)
+            self.canvas_image.coords(self._bg_item_id, 0, 0)
 
-        # Display checkerboard as background
-        self.canvas_image.create_image(0, 0, anchor=tk.NW, image=self.checkerboard_bg_tk)
+        # Optionally re-center the current image on resize
+        self._redraw_current()
 
 
     def update_image(self, algorithm=None):
@@ -455,16 +518,46 @@ class DitherMe:
 
     def display_image(self, img):
         """ Display the image on the canvas. """
+        if img is None:
+            return
 
-        img = img.resize((self.current_width, self.current_height), Image.LANCZOS)
+        base_w, base_h = self.current_width, self.current_height
+        scale = max(self.min_zoom, min(self.max_zoom, self.zoom))
+        disp_w = max(1, int(base_w * scale))
+        disp_h = max(1, int(base_h * scale))
+        img_resized = img.resize((disp_w, disp_h), Image.LANCZOS)
+        img_tk = ImageTk.PhotoImage(img_resized.convert("RGBA"))
 
-        # Composite over checkerboard
-        composite = Image.alpha_composite(self.checkerboard_bg.convert("RGBA"), img.convert("RGBA"))
 
-        # Convert to Tkinter format and display
-        img_tk = ImageTk.PhotoImage(composite)
-        self.canvas_image.create_image(self.current_width // 2, self.current_height // 2, image=img_tk)
+        # Canvas center (we want to keep it centered + pan offset)
+        canvas_w = self.canvas_image.winfo_width() or base_w
+        canvas_h = self.canvas_image.winfo_height() or base_h
+        center_x = canvas_w // 2 + self.pan_x
+        center_y = canvas_h // 2 + self.pan_y
+
+        if self._image_item_id is None:
+            # First time: create the item
+            self._image_item_id = self.canvas_image.create_image(center_x, center_y, image=img_tk)
+        else:
+            # Update existing item (faster than recreating)
+            self.canvas_image.itemconfig(self._image_item_id, image=img_tk)
+            self.canvas_image.coords(self._image_item_id, center_x, center_y)
+
+        # Keep reference so it doesn't get GC'd
         self.canvas_image.image = img_tk
+
+
+    def _redraw_current(self):
+        """Redraw the currently active image or GIF frame (for zoom/resize)."""
+        if self.is_gif and self.gif_frames:
+            frame = self.processed_gif_frames[self.current_frame_index]
+            if frame is None:
+                frame = self.gif_frames[self.current_frame_index]
+            self.display_image(frame)
+        elif self.processed_image is not None:
+            self.display_image(self.processed_image)
+        elif self.image is not None:
+            self.display_image(self.image)
 
 
     def create_checkerboard(self, width, height, box_size=10):
@@ -492,6 +585,59 @@ class DitherMe:
         """ Stop the GIF animation """
 
         self.playing = False
+
+
+    def set_zoom(self, new_zoom: float):
+        """Set zoom level and refresh view."""
+        new_zoom = max(self.min_zoom, min(self.max_zoom, new_zoom))
+        if abs(new_zoom - self.zoom) < 1e-3:
+            return
+
+        self.zoom = new_zoom
+        self._redraw_current()
+
+
+    def on_mouse_wheel(self, event):
+        """Zoom in/out with the mouse wheel (Windows/macOS)."""
+        factor = 1.1 if event.delta > 0 else 1 / 1.1
+        self.set_zoom(self.zoom * factor)
+
+
+    def on_mouse_wheel_linux(self, event):
+        """Zoom in/out with the mouse wheel (Linux Button-4/5)."""
+        factor = 1.1 if event.num == 4 else 1 / 1.1
+        self.set_zoom(self.zoom * factor)
+
+
+    def reset_view(self, event=None):
+        """Reset zoom & pan to default (center image)."""
+        self.zoom = 1.0
+        self.pan_x = 0
+        self.pan_y = 0
+        self._redraw_current()
+
+
+    def on_pan_start(self, event):
+        """Start panning (left mouse button)."""
+        self._drag_start = (event.x, event.y)
+
+
+    def on_pan_move(self, event):
+        """Pan while dragging. Only moves the canvas item (no heavy redraw)."""
+        if self._drag_start is None or self._image_item_id is None:
+            return
+
+        dx = event.x - self._drag_start[0]
+        dy = event.y - self._drag_start[1]
+        self._drag_start = (event.x, event.y)
+        self.canvas_image.move(self._image_item_id, dx, dy)
+        self.pan_x += dx
+        self.pan_y += dy
+
+
+    def on_pan_end(self, event):
+        """End panning."""
+        self._drag_start = None
 
 
     def animate(self):
