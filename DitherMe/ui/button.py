@@ -7,15 +7,26 @@ class Button(tk.Canvas):
     """ Button class """
 
     def __init__(self, parent, text, command=None, height=36, width=None, font=("Arial", 10), color_preview=False):
-        super().__init__(parent, height=height, bg="#474751", highlightthickness=0)
+        super().__init__(
+            parent,
+            height=height,
+            bg="#161719",
+            highlightthickness=2,
+            highlightbackground="#0E0F10",
+            highlightcolor="#2D8BFF",
+            bd=0,
+            relief=tk.FLAT,
+            cursor="hand2",
+            takefocus=1,
+        )
 
         self.command = command
-        self.default_bg = "#474751"
-        self.hover_bg = "#5A5A6E"
-        self.click_bg = "#373742"
-        self.text_color = "white"
+        self.default_bg = "#22242A"
+        self.hover_bg = "#2C2E35"
+        self.click_bg = "#1A1C21"
+        self.text_color = "#FFFFFF"
         self.color_preview = color_preview
-        self.preview_color = "#FFFFFF"  # Default preview color (white)
+        self.preview_color = "#FFFFFF"
 
         # Expand button width to match parent width
         self.pack(fill=tk.X, padx=8, pady=2)
@@ -34,7 +45,7 @@ class Button(tk.Canvas):
         # Draw color preview circle (if enabled)
         if self.color_preview:
             preview_radius = height // 3
-            preview_x = self.width - preview_radius - 10  # Position at 90% of width
+            preview_x = self.width - preview_radius - 10
             preview_y = height // 2
 
             self.color_circle = self.create_oval(
@@ -49,6 +60,10 @@ class Button(tk.Canvas):
         self.bind("<ButtonPress-1>", self.on_click)
         self.bind("<ButtonRelease-1>", self.on_release)
         self.bind("<Button-1>", self.on_button_press)
+        self.bind("<Return>", self.on_key_activate)
+        self.bind("<space>", self.on_key_activate)
+        self.bind("<FocusIn>", self.on_focus_in)
+        self.bind("<FocusOut>", self.on_focus_out)
 
         # Update width dynamically
         self.bind("<Configure>", self.resize_button)
@@ -98,3 +113,18 @@ class Button(tk.Canvas):
         if self.color_preview:
             self.preview_color = new_color
             self.itemconfig(self.color_circle, fill=new_color)
+
+    def on_focus_in(self, event):
+        """Highlight border when focused via keyboard."""
+        self.configure(highlightbackground="#2D8BFF")
+
+    def on_focus_out(self, event):
+        """Reset border when focus leaves."""
+        self.configure(highlightbackground="#0E0F10")
+
+    def on_key_activate(self, event):
+        """Activate button via keyboard."""
+        self.on_click(event)
+        self.after(80, lambda: self.on_release(event))
+        if self.command:
+            self.command()

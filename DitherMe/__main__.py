@@ -16,6 +16,10 @@ from ui.progress_bar import ProgressBar
 from algorithms import floydsteinberg, false_floydsteinberg, sierra, sierra_lite, sierra_two_row, atkinson, burkes, stucki, jarvis_judice_ninke, bayer_2x2, bayer_4x4, bayer_8x8, clustered_dot_4x4, checkered_small, checkered_medium, checkered_large, stevenson_arce, knoll, lattice_boltzmann
 
 
+APP_BG = "#0E0F10"
+CONTAINER_BG = "#161719"
+
+
 class DitherMe:
     """ Main application class for DitherMe. """
 
@@ -23,7 +27,7 @@ class DitherMe:
         self.root = main_root
         self.root.title("DitherMe")
         self.root.geometry("1110x775")
-        self.root.configure(bg="#1A1A23")
+        self.root.configure(bg=APP_BG)
 
         self.algorithms = {
             # Error Diffusion Dithering
@@ -64,12 +68,12 @@ class DitherMe:
         }
 
         # Sidebar
-        self.frame_right = tk.Frame(self.root, width=300, bg="#2A2B35")
+        self.frame_right = tk.Frame(self.root, width=300, bg=CONTAINER_BG)
         self.frame_right.pack(side=tk.RIGHT, fill=tk.Y)
         self.frame_right.pack_propagate(False)
 
         # Main content
-        self.frame_left = tk.Frame(self.root, bg="#1A1A23")
+        self.frame_left = tk.Frame(self.root, bg=CONTAINER_BG)
         self.frame_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Upload Button
@@ -79,7 +83,20 @@ class DitherMe:
         # Algorithm Dropdown
         self.selected_algorithm = tk.StringVar(value="Floyd-Steinberg")
         self.algorithm_dropdown = tk.OptionMenu(self.frame_right, self.selected_algorithm, *self.algorithms.keys(), command=self.update_image)
-        self.algorithm_dropdown.pack(pady=10, padx=10, fill=tk.X)
+        self.algorithm_dropdown.config(
+            bg=CONTAINER_BG,
+            fg="white",
+            activebackground="#22242A",
+            activeforeground="white",
+            highlightthickness=0,
+            relief=tk.FLAT
+        )
+        self.algorithm_dropdown["menu"].config(
+            bg=CONTAINER_BG,
+            fg="white",
+            activebackground="#22242A",
+            activeforeground="white"
+        )
 
         # Dictionary to store sliders
         self.sliders = {}
@@ -89,8 +106,18 @@ class DitherMe:
         }
 
         # Greyscale Checkbox
-        self.is_greyscale = tk.BooleanVar(value=True)  # Default is checked (True)
-        self.greyscale_checkbox = tk.Checkbutton(self.frame_right, text="Greyscale", variable=self.is_greyscale, bg="#2A2B35", fg="white", selectcolor="#2A2B35", command=self.update_image)
+        self.is_greyscale = tk.BooleanVar(value=True) 
+        self.greyscale_checkbox = tk.Checkbutton(
+            self.frame_right,
+            text="Greyscale",
+            variable=self.is_greyscale,
+            bg=CONTAINER_BG,
+            fg="white",
+            activebackground=CONTAINER_BG,
+            activeforeground="white",
+            selectcolor=CONTAINER_BG,
+            command=self.update_image
+        )
         self.greyscale_checkbox.pack(pady=5, padx=10, anchor="w")
 
         # Sliders
@@ -123,7 +150,7 @@ class DitherMe:
         self.reset_btn.pack(pady=10, padx=10)
 
         # Container for Image Preview
-        self.image_container = tk.Frame(self.frame_left, bg="#2A2B35", relief=tk.RIDGE)
+        self.image_container = tk.Frame(self.frame_left, bg=CONTAINER_BG, relief=tk.RIDGE)
         self.image_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Canvas for main image
@@ -131,7 +158,7 @@ class DitherMe:
         self.canvas_image.pack(expand=True)
 
         # Play/Stop Buttons
-        self.frame_bottom = tk.Frame(self.frame_left, bg="#1A1A23")
+        self.frame_bottom = tk.Frame(self.frame_left, bg=CONTAINER_BG)
         self.frame_bottom.pack(pady=10)
 
         self.play_btn = Button(self.frame_bottom, "Play GIF", command=self.play_gif)
@@ -145,7 +172,13 @@ class DitherMe:
         self.export_btn.pack(pady=10, padx=10)
 
         # Progress Bar
-        self.progress_bar = ProgressBar(self.frame_right, height=20, bg_color="#1A1A23", fg_color="#006CE8", border_color="#1A1A23")
+        self.progress_bar = ProgressBar(
+            self.frame_right,
+            height=20,
+            bg_color=CONTAINER_BG,
+            fg_color="#2D8BFF",
+            border_color=CONTAINER_BG
+        )
 
         # Image attributes
         self.image = None
@@ -214,15 +247,26 @@ class DitherMe:
         """ Open a file dialog to upload an image. """
 
         if not file_path:
-            file_path = filedialog.askopenfilename()
+            filetypes = [
+                ("Image files", "*.png *.jpg *.jpeg *.gif *.webp *.bmp *.tiff"),
+                ("All files", "*.*"),
+            ]
+            file_path = filedialog.askopenfilename(
+                title="Select an image or GIF",
+                filetypes=filetypes
+            )
 
         if file_path and os.path.exists(file_path):
             mime_type, _ = mimetypes.guess_type(file_path)
 
-            if not mime_type.startswith("image/"):
-                tk.messagebox.showerror("Invalid File", "Please select a valid image file (PNG, JPG, GIF, WEBP, BMP, TIFF).")
+            if not mime_type or not mime_type.startswith("image/"):
+                tk.messagebox.showerror(
+                    "Invalid File",
+                    "Please select a valid image file (PNG, JPG, GIF, WEBP, BMP, TIFF)."
+                )
                 return
 
+            self.root.title(f"DitherMe - {os.path.basename(file_path)}")
             self.is_gif = mime_type == "image/gif"
             self.image = Image.open(file_path)
 
@@ -275,12 +319,18 @@ class DitherMe:
     def update_image(self, algorithm=None):
         """ Update the displayed image based on the current settings. """
 
-        if self.is_gif:
-            self.processed_gif_frames = [self.process_frame(frame) for frame in self.gif_frames]
+        if self.is_gif and self.gif_frames:
+            # Clear all cached processed frames
+            self.processed_gif_frames = [None] * len(self.gif_frames)
 
-            # Reset to first frame
+            # Preprocess only a small number of frames for a fast preview
+            for i in range(min(self.preprocessed_frames, len(self.gif_frames))):
+                self.processed_gif_frames[i] = self.process_frame(self.gif_frames[i])
+
+            # Reset to first frame and show it
             self.current_frame_index = 0
             self.display_image(self.processed_gif_frames[0])
+
         elif self.image:
             self.processed_image = self.process_frame(self.image)
             self.display_image(self.processed_image)

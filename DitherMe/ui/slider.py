@@ -7,7 +7,7 @@ class Slider(tk.Canvas):
     """ Slider class """
 
     def __init__(self, parent, label: str, min_val: float, max_val: float, default_val: float, command=None, resolution=1):
-        super().__init__(parent, height=40, bg="#2A2B35", highlightthickness=0)
+        super().__init__(parent, height=40, bg="#161719", highlightthickness=0)
 
         self.label = label
         self.min_val = min_val
@@ -25,28 +25,37 @@ class Slider(tk.Canvas):
         self.current_value = default_val
 
         # Create a frame to hold all elements
-        self.container = tk.Frame(parent, bg="#2A2B35")
+        self.container = tk.Frame(parent, bg="#161719")
         self.container.pack(pady=2, padx=5, fill=tk.X)
 
         # Create slider row (slider + value)
-        self.slider_row = tk.Frame(self.container, bg="#2A2B35")
+        self.slider_row = tk.Frame(self.container, bg="#161719")
         self.slider_row.pack(fill=tk.X)
 
         # Create slider canvas
-        super().__init__(self.slider_row, height=40, width=self.slider_width, bg="#2A2B35", highlightthickness=0)
+        super().__init__(self.slider_row, height=40, width=self.slider_width, bg="#161719", highlightthickness=0)
         self.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         # Create value label (to the right of slider)
-        self.value_label = tk.Label(self.slider_row, text=str(round(default_val, 1)), bg="#2A2B35", fg="white", width=4)
+        self.value_label = tk.Label(self.slider_row, text=str(round(default_val, 1)), bg="#161719", fg="white", width=4)
         self.value_label.pack(side=tk.RIGHT, padx=(5, 0), pady=(5.5, 0))
 
         # Bind event to allow user input
         self.value_label.bind("<Button-1>", self.enable_text_input)
 
         # Create slider components
-        self.track = self.create_rectangle(10, 20, self.slider_width - 10, 20 + self.slider_height, fill="#D3D3D3", outline="")
-        self.progress = self.create_rectangle(10, 20, 10, 20 + self.slider_height, fill="#006CE8", outline="")
-        self.knob = self.create_oval(10, 16, 10 + self.dot_radius * 2, 16 + self.dot_radius * 2, fill="#0059BF", outline="black")
+        self.track = self.create_rectangle(
+            10, 20, self.slider_width - 10, 20 + self.slider_height,
+            fill="#2A2C33", outline=""
+        )
+        self.progress = self.create_rectangle(
+            10, 20, 10, 20 + self.slider_height,
+            fill="#2D8BFF", outline=""
+        )
+        self.knob = self.create_oval(
+            10, 16, 10 + self.dot_radius * 2, 16 + self.dot_radius * 2,
+            fill="#2D8BFF", outline="#0E0F10"
+        )
 
         # Create label directly above the slider (aligned to the left)
         self.label_text = self.create_text(10, 8, text=label, fill="white", font=("Arial", 10), anchor="w")
@@ -113,7 +122,7 @@ class Slider(tk.Canvas):
     def enable_text_input(self, event):
         """ Replace the label with an entry field for manual input """
 
-        self.value_entry = tk.Entry(self.slider_row, width=4, bg="#2A2B35", fg="white", insertbackground="white")
+        self.value_entry = tk.Entry(self.slider_row, width=4, bg="#161719", fg="white", insertbackground="white")
         self.value_entry.insert(0, str(self.current_value))
         self.value_entry.pack(side=tk.RIGHT, padx=(5, 0), pady=(5.5, 0))
 

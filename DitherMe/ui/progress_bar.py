@@ -6,7 +6,7 @@ import tkinter as tk
 class ProgressBar:
     """ Progress bar class """
 
-    def __init__(self, master, height=20, bg_color='#404040', fg_color='#00B7FF', border_color=None):
+    def __init__(self, master, height=20, bg_color='#161719', fg_color='#2D8BFF', border_color=None):
         self.master = master
         self.height = height
         self.fg_color = fg_color
