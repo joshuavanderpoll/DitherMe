@@ -27,12 +27,11 @@ jobs:
       - name: Install System Dependencies (Ubuntu)
         if: matrix.os == 'ubuntu-22.04'
         run: |
-          sudo find /etc/apt/sources.list.d -type f -print0 | xargs -0 sudo sed -i '/packages\.microsoft\.com/d'
-          sudo rm -f /etc/apt/sources.list.d/azure-cli.list /etc/apt/sources.list.d/microsoft-prod.list || true
+          sudo rm -f /etc/apt/sources.list.d/azure-cli* /etc/apt/sources.list.d/microsoft-prod* || true
+          sudo sed -i '/packages\.microsoft\.com/d' /etc/apt/sources.list || true
 
-          sudo apt update
-          sudo apt install -y python3-tk python3-dev libpng-dev build-essential
-
+          sudo apt-get update
+          sudo apt-get install -y python3-tk python3-dev libpng-dev build-essential
 
       - name: Install System Dependencies (macOS)
         if: matrix.os == 'macos-latest'
