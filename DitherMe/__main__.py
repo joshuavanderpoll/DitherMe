@@ -482,15 +482,18 @@ class DitherMe:
     def process_frame(self, img):
         """ Process an image frame """
 
-        # Ensure image is in RGB mode
+        # Extract alpha before any conversion so we can restore it at the end
+        alpha_channel = img.convert("RGBA").split()[3]
+
         img_rgb = img.convert("RGB")
 
         # Get scale factor (percent-based)
         scale_factor = self.sliders["scale"].get_value() / 100.0
 
-        # Resize image
+        # Resize image and alpha together so they stay in sync
         new_size = (max(1, int(img.width * scale_factor)), max(1, int(img.height * scale_factor)))
         img_resized = img_rgb.resize(new_size, Image.LANCZOS)
+        alpha_channel = alpha_channel.resize(new_size, Image.LANCZOS)
 
         # Convert to grayscale if selected
         if self.is_greyscale.get():
@@ -525,20 +528,20 @@ class DitherMe:
         # Apply noise
         img_converted = self.apply_noise(img_converted)
 
-        # Apply dithering algorithm
-        img_rgba = img_converted.convert("RGBA")
+        # Apply dithering algorithm — pass alpha=255 so only RGB channels are dithered
+        r, g, b = img_converted.convert("RGB").split()
+        img_rgba = Image.merge("RGBA", (r, g, b, Image.new("L", (r.width, r.height), 255)))
         raw_bytes = img_rgba.tobytes()
         w, h = img_rgba.size
         dither_algorithm = self.algorithms[self.selected_algorithm.get()]
         threshold_value = int(self.sliders["threshold"].get_value())
         dithered_bytes = dither_algorithm.dither(raw_bytes, w, h, threshold_value)
         dithered_img = Image.frombytes("RGBA", (w, h), dithered_bytes)
-        if self.is_greyscale.get():
-            dithered_img = dithered_img.convert("L")
 
         # If greyscale mode is enabled, apply foreground/background colors
         if self.is_greyscale.get():
-            np_dithered = np.array(dithered_img)
+            np_dithered = np.array(dithered_img.convert("L"))
+            orig_alpha = np.array(alpha_channel, dtype=np.float32) / 255.0
 
             # Get foreground and background colors
             fg_color = ImageColor.getrgb(self.selected_foreground)
@@ -548,18 +551,19 @@ class DitherMe:
             fg_opacity = self.sliders["foreground_opacity"].get_value() / 255.0
             bg_opacity = self.sliders["background_opacity"].get_value() / 255.0
 
-            # Convert to RGBA
-            np_colored = np.zeros((*np_dithered.shape, 4), dtype=np.uint8)  # 4 channels (RGBA)
+            # Build RGBA output, multiplying slider opacity by original alpha
+            np_colored = np.zeros((*np_dithered.shape, 4), dtype=np.uint8)
+            fg_mask = np_dithered >= 128
+            np_colored[fg_mask, :3] = fg_color
+            np_colored[~fg_mask, :3] = bg_color
+            np_colored[fg_mask, 3] = (orig_alpha[fg_mask] * fg_opacity * 255).astype(np.uint8)
+            np_colored[~fg_mask, 3] = (orig_alpha[~fg_mask] * bg_opacity * 255).astype(np.uint8)
 
-            # Apply colors with opacity blending
-            np_colored[np_dithered < 128] = [*bg_color, int(bg_opacity * 255)]  # Dark pixels -> Background
-            np_colored[np_dithered >= 128] = [*fg_color, int(fg_opacity * 255)]  # Light pixels -> Foreground
-
-            # Convert back to PIL image
             final_image = Image.fromarray(np_colored, mode="RGBA")
         else:
-            # Keep dithered image as is if not in greyscale mode
-            final_image = dithered_img
+            # Restore original alpha — the dithered RGB is correct, alpha from C is discarded
+            r, g, b, _ = dithered_img.split()
+            final_image = Image.merge("RGBA", (r, g, b, alpha_channel))
 
         # Resize to original size for display
         final_image = final_image.resize((self.original_width, self.original_height), Image.NEAREST)
