@@ -29,35 +29,27 @@ void ordered_dither_clustered_dot_4x4(uint8_t *image, unsigned width, unsigned h
 
 static PyObject *dither_clustered_dot_4x4(PyObject *self, PyObject *args) {
     Py_buffer input_buffer;
+    unsigned int width, height;
     int threshold_arg = 128;
-    if (!PyArg_ParseTuple(args, "y*i", &input_buffer, &threshold_arg)) {
+    if (!PyArg_ParseTuple(args, "y*IIi", &input_buffer, &width, &height, &threshold_arg)) {
         return NULL;
     }
     int threshold_bias = threshold_arg - 128;
 
-    unsigned width, height;
-    uint8_t *image_data = decode_png((uint8_t *)input_buffer.buf, input_buffer.len, &width, &height);
+    Py_ssize_t data_len = input_buffer.len;
+    uint8_t *image_data = (uint8_t *)malloc(data_len);
     if (!image_data) {
-        PyErr_SetString(PyExc_RuntimeError, "Failed to decode PNG");
         PyBuffer_Release(&input_buffer);
+        PyErr_NoMemory();
         return NULL;
     }
+    memcpy(image_data, input_buffer.buf, data_len);
+    PyBuffer_Release(&input_buffer);
 
     ordered_dither_clustered_dot_4x4(image_data, width, height, 4, threshold_bias);
 
-    size_t output_size;
-    uint8_t *output_data = encode_png(image_data, width, height, &output_size);
+    PyObject *result = PyBytes_FromStringAndSize((char *)image_data, data_len);
     free(image_data);
-
-    if (!output_data) {
-        PyErr_SetString(PyExc_RuntimeError, "Failed to encode PNG");
-        PyBuffer_Release(&input_buffer);
-        return NULL;
-    }
-
-    PyObject *result = PyBytes_FromStringAndSize((char *)output_data, output_size);
-    free(output_data);
-    PyBuffer_Release(&input_buffer);
     return result;
 }
 

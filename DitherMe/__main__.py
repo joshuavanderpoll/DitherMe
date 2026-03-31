@@ -2,7 +2,6 @@
 # pylint: disable=line-too-long, unused-argument, no-member
 
 import os
-import io
 import sys
 import tkinter as tk
 from tkinter import filedialog, colorchooser
@@ -537,16 +536,16 @@ class DitherMe:
         # Apply noise
         img_converted = self.apply_noise(img_converted)
 
-        # Convert image to bytes
-        img_byte_arr = io.BytesIO()
-        img_converted.save(img_byte_arr, format="PNG")
-        img_bytes = img_byte_arr.getvalue()
-
         # Apply dithering algorithm
+        img_rgba = img_converted.convert("RGBA")
+        raw_bytes = img_rgba.tobytes()
+        w, h = img_rgba.size
         dither_algorithm = self.algorithms[self.selected_algorithm.get()]
         threshold_value = int(self.sliders["threshold"].get_value())
-        dithered_bytes = dither_algorithm.dither(img_bytes, threshold_value)
-        dithered_img = Image.open(io.BytesIO(dithered_bytes)).convert("L" if self.is_greyscale.get() else "RGB")
+        dithered_bytes = dither_algorithm.dither(raw_bytes, w, h, threshold_value)
+        dithered_img = Image.frombytes("RGBA", (w, h), dithered_bytes)
+        if self.is_greyscale.get():
+            dithered_img = dithered_img.convert("L")
 
         # If greyscale mode is enabled, apply foreground/background colors
         if self.is_greyscale.get():
