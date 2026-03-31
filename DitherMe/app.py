@@ -1,6 +1,9 @@
 # pylint: disable=line-too-long, unused-argument, no-member, missing-module-docstring, missing-class-docstring, missing-function-docstring, broad-exception-caught
 import os
 import sys
+import queue
+import threading
+import traceback
 import tkinter as tk
 from tkinter import filedialog, colorchooser, messagebox
 import mimetypes
@@ -66,32 +69,40 @@ class DitherMe:
         self.selected_background = "#000000"
         self.checkerboard_bg_tk = None
 
+        # Performance: debounce + background threading state
+        self._update_pending = None
+        self._processing_gen = 0
+        self._cached_view_image = None      # PIL Image at original size, rebuilt on each process
+        self._checkerboard_cache = {}       # (w, h) → PIL Image, avoids re-drawing the pattern
+        self._result_queue = queue.Queue()  # thread-safe channel: bg threads → main thread
+
         self.algorithms = {
-            "Floyd-Steinberg":      floydsteinberg,
+            "Floyd-Steinberg":       floydsteinberg,
             "False Floyd-Steinberg": false_floydsteinberg,
-            "Sierra":               sierra,
-            "Sierra Lite":          sierra_lite,
-            "Sierra Two-Row":       sierra_two_row,
-            "Atkinson":             atkinson,
-            "Burkes":               burkes,
-            "Stucki":               stucki,
+            "Sierra":                sierra,
+            "Sierra Lite":           sierra_lite,
+            "Sierra Two-Row":        sierra_two_row,
+            "Atkinson":              atkinson,
+            "Burkes":                burkes,
+            "Stucki":                stucki,
             "Jarvis-Judice & Ninke": jarvis_judice_ninke,
-            "Stevenson-Arce":       stevenson_arce,
-            "Knoll":                knoll,
-            "Bayer 2x2":            bayer_2x2,
-            "Bayer 4x4":            bayer_4x4,
-            "Bayer 8x8":            bayer_8x8,
-            "Clustered Dot 4x4":    clustered_dot_4x4,
-            "Lattice-Boltzmann":    lattice_boltzmann,
-            "Checkered Small":      checkered_small,
-            "Checkered Medium":     checkered_medium,
-            "Checkered Large":      checkered_large,
+            "Stevenson-Arce":        stevenson_arce,
+            "Knoll":                 knoll,
+            "Bayer 2x2":             bayer_2x2,
+            "Bayer 4x4":             bayer_4x4,
+            "Bayer 8x8":             bayer_8x8,
+            "Clustered Dot 4x4":     clustered_dot_4x4,
+            "Lattice-Boltzmann":     lattice_boltzmann,
+            "Checkered Small":       checkered_small,
+            "Checkered Medium":      checkered_medium,
+            "Checkered Large":       checkered_large,
         }
 
         self._build_layout()
         self._build_menubar()
 
         self.update_canvas_size()
+        self._drain_result_queue()
 
         if startup_file and os.path.exists(startup_file):
             self.upload_image(startup_file)
@@ -134,6 +145,7 @@ class DitherMe:
             command=self.update_image,
         ).pack(pady=5, padx=10, anchor="w")
 
+        # All slider commands go through _schedule_update to debounce rapid drag events
         self._add_slider("Scale (%)",  "scale",      1,    100,  100,  True)
         self._add_slider("Contrast",   "contrast",   0.5,  3.0,  1.0,  0.1)
         self._add_slider("Midtones",   "midtones",   0.5,  3.0,  1.0,  0.1)
@@ -212,7 +224,7 @@ class DitherMe:
         self.sliders[key] = Slider(
             self.frame_right, label,
             min_val=from_, max_val=to, default_val=default,
-            command=lambda v: self.update_image(),
+            command=lambda v: self._schedule_update(),
             resolution=resolution,
         )
 
@@ -233,6 +245,103 @@ class DitherMe:
             "foreground_opacity": self.sliders["foreground_opacity"].get_value(),
             "background_opacity": self.sliders["background_opacity"].get_value(),
         }
+
+    # --- Debounce & background processing ---
+
+    def _drain_result_queue(self):
+        # Runs on the main thread every ~16ms. Tkinter is not thread-safe, so background
+        # threads must never call root.after() or touch widgets directly. Instead they
+        # put results here and this loop delivers them safely on the main thread.
+        try:
+            while True:
+                item = self._result_queue.get_nowait()
+                if item[0] == 'still':
+                    _, gen, result = item
+                    self._on_still_ready(gen, result)
+                else:  # 'frame'
+                    _, gen, frame_idx, result = item
+                    self._on_frame_ready(gen, frame_idx, result)
+        except queue.Empty:
+            pass
+        self.root.after(16, self._drain_result_queue)
+
+    def _schedule_update(self):
+        # Cancel any pending update and restart the 150ms timer.
+        # This way rapid slider drags only trigger one process_frame call.
+        if self._update_pending is not None:
+            self.root.after_cancel(self._update_pending)
+        self._update_pending = self.root.after(150, self._do_update)
+
+    def _do_update(self):
+        self._update_pending = None
+        self.update_image()
+
+    def update_image(self, _=None):
+        # Bump the generation so any in-flight thread result gets discarded
+        self._processing_gen += 1
+        gen = self._processing_gen
+        settings = self._get_settings()
+        algs = self.algorithms
+
+        if self.is_gif and self.gif_frames:
+            # Invalidate processed cache and kick off the current frame only.
+            # Remaining frames are processed lazily by animate() / export.
+            self.processed_gif_frames = [None] * len(self.gif_frames)
+            frame_idx = self.current_frame_index
+            img = self.gif_frames[frame_idx]
+
+            def _gif_work():
+                try:
+                    result = process_frame(img, algs, settings)
+                except Exception:
+                    traceback.print_exc()
+                    result = img  # fall back to unprocessed frame
+                if self._processing_gen == gen:
+                    self._result_queue.put(('frame', gen, frame_idx, result))
+
+            threading.Thread(target=_gif_work, daemon=True).start()
+
+        elif self.image:
+            img = self.image
+
+            def _still_work():
+                try:
+                    result = process_frame(img, algs, settings)
+                except Exception:
+                    traceback.print_exc()
+                    result = img  # fall back to unprocessed image
+                if self._processing_gen == gen:
+                    self._result_queue.put(('still', gen, result))
+
+            threading.Thread(target=_still_work, daemon=True).start()
+
+    def _on_still_ready(self, gen, result):
+        if gen != self._processing_gen:
+            return
+        self.processed_image = result
+        self._cached_view_image = None
+        self._rebuild_view()
+
+    def _on_frame_ready(self, gen, frame_idx, result):
+        if gen != self._processing_gen:
+            return
+        self.processed_gif_frames[frame_idx] = result
+        if frame_idx == self.current_frame_index:
+            self._cached_view_image = None
+            self._rebuild_view()
+
+    # --- View rendering ---
+
+    def _rebuild_view(self):
+        orig, proc = self._get_current_frames()
+        view = self._build_view_image(orig, proc)
+        if view is not None:
+            self._cached_view_image = view
+        self._display_cached()
+
+    def _display_cached(self):
+        if self._cached_view_image is not None:
+            self.display_image(self._cached_view_image)
 
     def pick_foreground(self):
         color = colorchooser.askcolor(title="Choose Foreground Color")[1]
@@ -281,11 +390,15 @@ class DitherMe:
         self.image = Image.open(file_path)
 
         if self.is_gif:
-            self.gif_durations = [f.info.get("duration", 100) for f in ImageSequence.Iterator(self.image)]
-            self.gif_frames = [f.convert("RGBA") for f in ImageSequence.Iterator(self.image)]
+            # Single pass: collect durations and converted frames together
+            frames = []
+            durations = []
+            for f in ImageSequence.Iterator(self.image):
+                durations.append(f.info.get("duration", 100))
+                frames.append(f.convert("RGBA"))
+            self.gif_durations = durations
+            self.gif_frames = frames
             self.processed_gif_frames = [None] * len(self.gif_frames)
-            for i in range(min(self.preprocessed_frames, len(self.gif_frames))):
-                self.processed_gif_frames[i] = process_frame(self.gif_frames[i], self.algorithms, self._get_settings())
         else:
             self.image = self.image.convert("RGBA")
             self.processed_image = self.image.copy()
@@ -295,19 +408,12 @@ class DitherMe:
         self.pan_x = 0
         self.pan_y = 0
         self._drag_start = None
+        self._cached_view_image = None
         self.update_canvas_size()
+        # Show the original image immediately so the canvas isn't blank while the
+        # background thread processes. _on_still_ready will replace it when done.
+        self._rebuild_view()
         self.update_image()
-
-    def update_image(self, _=None):
-        if self.is_gif and self.gif_frames:
-            self.processed_gif_frames = [None] * len(self.gif_frames)
-            for i in range(min(self.preprocessed_frames, len(self.gif_frames))):
-                self.processed_gif_frames[i] = process_frame(self.gif_frames[i], self.algorithms, self._get_settings())
-            self.current_frame_index = 0
-            self._redraw_current()
-        elif self.image:
-            self.processed_image = process_frame(self.image, self.algorithms, self._get_settings())
-            self._redraw_current()
 
     def _update_gif_controls(self):
         if self.is_gif:
@@ -335,27 +441,44 @@ class DitherMe:
             self.current_width, self.current_height = self.original_width, self.original_height
 
     def on_canvas_resize(self, event):
-        self.canvas_width = max(1, event.width)
-        self.canvas_height = max(1, event.height)
-        bg = self._make_checkerboard(self.canvas_width, self.canvas_height)
+        w = max(1, event.width)
+        h = max(1, event.height)
+
+        # Skip the redraw if nothing actually changed (Configure fires for many reasons)
+        if w == self.canvas_width and h == self.canvas_height:
+            return
+
+        self.canvas_width = w
+        self.canvas_height = h
+
+        bg = self._make_checkerboard(w, h)
         self.checkerboard_bg_tk = ImageTk.PhotoImage(bg)
         if self._bg_item_id is None:
             self._bg_item_id = self.canvas_image.create_image(0, 0, anchor=tk.NW, image=self.checkerboard_bg_tk)
         else:
             self.canvas_image.itemconfig(self._bg_item_id, image=self.checkerboard_bg_tk)
             self.canvas_image.coords(self._bg_item_id, 0, 0)
-        self._redraw_current()
+
+        self._display_cached()
 
     def on_view_mode_change(self, *_):
-        self._redraw_current()
+        # View mode change only needs a display rebuild, not a full reprocess
+        self._cached_view_image = None
+        self._rebuild_view()
 
     def _make_checkerboard(self, width, height, box_size=10):
+        key = (width, height)
+        if key in self._checkerboard_cache:
+            return self._checkerboard_cache[key]
+
         img = Image.new("RGB", (width, height), "#BFBFBF")
         draw = ImageDraw.Draw(img)
         for y in range(0, height, box_size * 2):
             for x in range(0, width, box_size * 2):
                 draw.rectangle([x, y, x + box_size, y + box_size], fill="#E0E0E0")
                 draw.rectangle([x + box_size, y + box_size, x + box_size * 2, y + box_size * 2], fill="#E0E0E0")
+
+        self._checkerboard_cache[key] = img
         return img
 
     def _get_current_frames(self):
@@ -370,8 +493,8 @@ class DitherMe:
         return orig, proc
 
     def _redraw_current(self):
-        orig, proc = self._get_current_frames()
-        self.display_image(self._build_view_image(orig, proc))
+        self._cached_view_image = None
+        self._rebuild_view()
 
     def _build_view_image(self, orig, proc):
         if orig is None and proc is None:
@@ -380,11 +503,18 @@ class DitherMe:
         proc = (proc or orig).convert("RGBA")
 
         img_w, img_h = self.original_width, self.original_height
-        orig = orig.resize((img_w, img_h), Image.LANCZOS)
-        proc = proc.resize((img_w, img_h), Image.LANCZOS)
 
+        # Fast path: split view not needed, only use proc
         if self.view_mode.get() != "Split":
+            if proc.size != (img_w, img_h):
+                proc = proc.resize((img_w, img_h), Image.NEAREST)
             return proc
+
+        # Split view: resize both images (LANCZOS for orig, NEAREST for dithered proc)
+        if orig.size != (img_w, img_h):
+            orig = orig.resize((img_w, img_h), Image.LANCZOS)
+        if proc.size != (img_w, img_h):
+            proc = proc.resize((img_w, img_h), Image.NEAREST)
 
         self.split_ratio = max(0.05, min(0.95, self.split_ratio))
         sx = max(0, min(img_w, int(self.split_ratio * img_w)))
@@ -408,7 +538,10 @@ class DitherMe:
         scale = max(self.min_zoom, min(self.max_zoom, self.zoom))
         disp_w = max(1, int(self.current_width * scale))
         disp_h = max(1, int(self.current_height * scale))
-        img_tk = ImageTk.PhotoImage(img.resize((disp_w, disp_h), Image.LANCZOS).convert("RGBA"))
+
+        # NEAREST is fast and correct for dithered output — LANCZOS would anti-alias
+        # the binary pixel pattern into gray, which looks worse and is slower
+        img_tk = ImageTk.PhotoImage(img.resize((disp_w, disp_h), Image.NEAREST).convert("RGBA"))
 
         canvas_w = self.canvas_image.winfo_width() or self.current_width
         canvas_h = self.canvas_image.winfo_height() or self.current_height
@@ -434,7 +567,8 @@ class DitherMe:
         if abs(new_zoom - self.zoom) < 1e-3:
             return
         self.zoom = new_zoom
-        self._redraw_current()
+        # Reuse the cached view image — zoom only changes display size, not the content
+        self._display_cached()
 
     def on_mouse_wheel(self, event):
         self.set_zoom(self.zoom * (1.1 if event.delta > 0 else 1 / 1.1))
@@ -446,7 +580,7 @@ class DitherMe:
         self.zoom = 1.0
         self.pan_x = 0
         self.pan_y = 0
-        self._redraw_current()
+        self._display_cached()
 
     def on_pan_start(self, event):
         self._drag_start = (event.x, event.y)
@@ -462,13 +596,16 @@ class DitherMe:
         if self._dragging_divider and self.view_mode.get() == "Split" and self._display_w:
             left_edge = self._display_cx - self._display_w / 2
             self.split_ratio = max(0.05, min(0.95, (event.x - left_edge) / self._display_w))
-            self._redraw_current()
+            # Split divider moved: must rebuild view image, but no reprocess
+            self._cached_view_image = None
+            self._rebuild_view()
             return
         if self._drag_start is None:
             return
         dx = event.x - self._drag_start[0]
         dy = event.y - self._drag_start[1]
         self._drag_start = (event.x, event.y)
+        # Pan is pure canvas offset — no image rebuild needed at all
         self.canvas_image.move(self._image_item_id, dx, dy)
         self.pan_x += dx
         self.pan_y += dy
@@ -489,12 +626,16 @@ class DitherMe:
             return
         if self.current_frame_index >= len(self.gif_frames):
             self.current_frame_index = 0
-        # lazy-process frame on first access during playback
+
+        # Process the current frame synchronously only if not yet done
         if self.processed_gif_frames[self.current_frame_index] is None:
             self.processed_gif_frames[self.current_frame_index] = process_frame(
                 self.gif_frames[self.current_frame_index], self.algorithms, self._get_settings()
             )
-        self._redraw_current()
+
+        self._cached_view_image = None
+        self._rebuild_view()
+
         duration = self.gif_durations[self.current_frame_index]
         self.current_frame_index = (self.current_frame_index + 1) % len(self.gif_frames)
         self.root.after(duration, self.animate)

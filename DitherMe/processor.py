@@ -12,13 +12,19 @@ def apply_noise(img, noise_level):
 
 
 def process_frame(img, algorithms, settings):
+    orig_w, orig_h = img.width, img.height
+
     # preserve alpha before any conversion so transparent images stay correct
     alpha = img.convert("RGBA").split()[3]
 
     scale = settings["scale"] / 100.0
-    new_size = (max(1, int(img.width * scale)), max(1, int(img.height * scale)))
-    img_rgb = img.convert("RGB").resize(new_size, Image.LANCZOS)
-    alpha = alpha.resize(new_size, Image.LANCZOS)
+    if scale != 1.0:
+        new_w = max(1, int(orig_w * scale))
+        new_h = max(1, int(orig_h * scale))
+        img_rgb = img.convert("RGB").resize((new_w, new_h), Image.LANCZOS)
+        alpha = alpha.resize((new_w, new_h), Image.LANCZOS)
+    else:
+        img_rgb = img.convert("RGB")
 
     work = img_rgb.convert("L") if settings["greyscale"] else img_rgb
     work = ImageEnhance.Contrast(work).enhance(settings["contrast"])
@@ -65,4 +71,7 @@ def process_frame(img, algorithms, settings):
         r, g, b, _ = dithered.split()
         final = Image.merge("RGBA", (r, g, b, alpha))
 
-    return final.resize((img.width, img.height), Image.NEAREST)
+    # only resize back if scale was applied — at scale=100 final is already original size
+    if final.size != (orig_w, orig_h):
+        return final.resize((orig_w, orig_h), Image.NEAREST)
+    return final
