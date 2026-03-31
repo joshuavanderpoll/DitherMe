@@ -3,8 +3,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <png.h>
-#include "image_utils.h"
 
 void knoll_dither(uint8_t *image, unsigned width, unsigned height, unsigned channels, uint8_t threshold) {
     // Knoll diffusion matrix (5x5)

@@ -86,21 +86,10 @@ class DitherMe:
             "Clustered Dot 4x4": clustered_dot_4x4,
             "Lattice-Boltzmann": lattice_boltzmann,
 
-            # Noise-Based Dithering
-            # "Random": ,
-            # "Blue Noise": ,
-            # "Void-and-Cluster": ,
-
-            # # Checkered Dithering
+            # Checkered Dithering
             "Checkered Small": checkered_small,
             "Checkered Medium": checkered_medium,
             "Checkered Large": checkered_large,
-
-            # Artistic Dithering
-            # "Radial Burst": ,
-            # "Vortex": ,
-            # "Diamond": ,
-            # "Spiral": ,
         }
 
         # Sidebar

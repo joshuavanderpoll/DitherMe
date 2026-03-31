@@ -3,8 +3,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <png.h>
-#include "image_utils.h"
 
 static const uint8_t BAYER_8x8[8][8] = {
     {  0, 32,  8, 40,  2, 34, 10, 42 },

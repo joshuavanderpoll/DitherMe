@@ -6,24 +6,14 @@ from setuptools import setup, Extension, find_packages
 
 # Define project directory
 PROJECT_DIR = os.path.abspath(os.path.dirname(__file__))
-PNG_LIB_PATH = os.path.join(PROJECT_DIR, "png_lib")
 
 # Determine include and library directories
+include_dirs = []
+library_dirs = []
 libraries = []
-vcpkg_root = os.environ.get("VCPKG_ROOT")
-if vcpkg_root and sys.platform == "win32":
-    # Windows with vcpkg
-    include_dirs = [os.path.join(vcpkg_root, "installed", "x64-windows", "include")]
-    library_dirs = [os.path.join(vcpkg_root, "installed", "x64-windows", "lib")]
-    libraries = ["libpng16"]
-else:
-    # macOS/Ubuntu with local png_lib or system libpng
-    include_dirs = [os.path.join(PNG_LIB_PATH, "include")]
-    library_dirs = [os.path.join(PNG_LIB_PATH, "lib")]
-    libraries = ["png"]
 
 # Shared source files
-shared_sources = ["DitherMe/algorithms/image_utils.c"]
+shared_sources = []
 
 # List of dithering algorithms
 dither_algorithms = [
@@ -68,22 +58,6 @@ def make_extension(name):
 
 # Create all extensions dynamically
 extensions = [make_extension(name) for name in dither_algorithms]
-
-# Check if libpng is likely available
-libpng_found = False
-for lib_dir in library_dirs:
-    if sys.platform == "win32":
-        if os.path.exists(os.path.join(lib_dir, "libpng16.lib")):
-            libpng_found = True
-            break
-    else:
-        if os.path.exists(os.path.join(lib_dir, "libpng.a")) or os.path.exists(os.path.join(lib_dir, "libpng.so")):
-            libpng_found = True
-            break
-
-if not libpng_found:
-    print(f"Warning: libpng not found in {library_dirs}. Make sure libpng is installed.")
-    exit(1)
 
 # Setup configuration
 setup(

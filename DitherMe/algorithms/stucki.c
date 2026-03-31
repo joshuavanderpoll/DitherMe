@@ -3,8 +3,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <png.h>
-#include "image_utils.h"
 
 void stucki_dither(uint8_t *image, unsigned width, unsigned height, unsigned channels, uint8_t threshold) {
     int8_t stucki_matrix[12][2] = {

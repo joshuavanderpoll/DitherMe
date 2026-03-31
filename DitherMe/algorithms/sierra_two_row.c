@@ -3,8 +3,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <png.h>
-#include "image_utils.h"
 
 void sierra_two_row_dither(uint8_t *image, unsigned width, unsigned height, unsigned channels, uint8_t threshold) {
     int8_t sierra_two_row_matrix[4][2] = {

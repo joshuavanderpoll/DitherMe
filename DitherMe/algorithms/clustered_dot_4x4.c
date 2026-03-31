@@ -3,8 +3,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <png.h>
-#include "image_utils.h"
 
 static const uint8_t CLUSTERED_DOT_4x4[4][4] = {
     {12,  5,  6, 13},

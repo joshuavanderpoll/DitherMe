@@ -3,8 +3,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <png.h>
-#include "image_utils.h"
 
 // Apply a small checkerboard dithering pattern
 void checkered_dither(uint8_t *image, unsigned width, unsigned height, unsigned channels, uint8_t threshold) {
