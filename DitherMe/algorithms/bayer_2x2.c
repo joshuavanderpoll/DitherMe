@@ -11,13 +11,15 @@ static const uint8_t BAYER_2x2[2][2] = {
     {3, 1}
 };
 
-void ordered_dither_bayer_2x2(uint8_t *image, unsigned width, unsigned height, unsigned channels) {
+void ordered_dither_bayer_2x2(uint8_t *image, unsigned width, unsigned height, unsigned channels, int threshold_bias) {
     for (unsigned y = 0; y < height; y++) {
         for (unsigned x = 0; x < width; x++) {
             for (unsigned c = 0; c < channels; c++) {
                 uint8_t *pixel = &image[(y * width + x) * channels + c];
-                uint8_t threshold = (BAYER_2x2[y % 2][x % 2] * 255) / 4;
-                *pixel = (*pixel > threshold) ? 255 : 0;
+                uint8_t matrix_threshold = (BAYER_2x2[y % 2][x % 2] * 255) / 4;
+                int adjusted = (int)*pixel + threshold_bias;
+                adjusted = adjusted < 0 ? 0 : (adjusted > 255 ? 255 : adjusted);
+                *pixel = ((uint8_t)adjusted > matrix_threshold) ? 255 : 0;
             }
         }
     }
@@ -25,18 +27,21 @@ void ordered_dither_bayer_2x2(uint8_t *image, unsigned width, unsigned height, u
 
 static PyObject *dither_bayer_2x2(PyObject *self, PyObject *args) {
     Py_buffer input_buffer;
-    if (!PyArg_ParseTuple(args, "y*", &input_buffer)) {
+    int threshold_arg = 128;
+    if (!PyArg_ParseTuple(args, "y*i", &input_buffer, &threshold_arg)) {
         return NULL;
     }
+    int threshold_bias = threshold_arg - 128;
 
     unsigned width, height;
     uint8_t *image_data = decode_png((uint8_t *)input_buffer.buf, input_buffer.len, &width, &height);
     if (!image_data) {
         PyErr_SetString(PyExc_RuntimeError, "Failed to decode PNG");
+        PyBuffer_Release(&input_buffer);
         return NULL;
     }
 
-    ordered_dither_bayer_2x2(image_data, width, height, 4);
+    ordered_dither_bayer_2x2(image_data, width, height, 4, threshold_bias);
 
     size_t output_size;
     uint8_t *output_data = encode_png(image_data, width, height, &output_size);
@@ -44,11 +49,13 @@ static PyObject *dither_bayer_2x2(PyObject *self, PyObject *args) {
 
     if (!output_data) {
         PyErr_SetString(PyExc_RuntimeError, "Failed to encode PNG");
+        PyBuffer_Release(&input_buffer);
         return NULL;
     }
 
     PyObject *result = PyBytes_FromStringAndSize((char *)output_data, output_size);
     free(output_data);
+    PyBuffer_Release(&input_buffer);
     return result;
 }
 

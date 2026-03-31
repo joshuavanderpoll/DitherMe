@@ -20,6 +20,7 @@ uint8_t *decode_png(const uint8_t *input, size_t input_size, unsigned *width, un
     }
 
     if (!png_image_finish_read(&image, NULL, buffer, 0, NULL)) {
+        png_image_free(&image);
         free(buffer);
         return NULL;
     }

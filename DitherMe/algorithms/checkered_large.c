@@ -7,15 +7,17 @@
 #include "image_utils.h"
 
 // Apply a large checkerboard dithering pattern (4x4 blocks)
-void checkered_dither(uint8_t *image, unsigned width, unsigned height, unsigned channels) {
+void checkered_dither(uint8_t *image, unsigned width, unsigned height, unsigned channels, uint8_t threshold) {
+    uint8_t low_t  = (uint8_t)((uint16_t)threshold * 2 / 3);
+    uint8_t high_t = (uint8_t)((uint16_t)threshold * 4 / 3 > 255 ? 255 : (uint16_t)threshold * 4 / 3);
     for (unsigned y = 0; y < height; y++) {
         for (unsigned x = 0; x < width; x++) {
             uint8_t *pixel = &image[(y * width + x) * channels];
 
             uint8_t brightness = (uint8_t)(0.299 * pixel[0] + 0.587 * pixel[1] + 0.114 * pixel[2]);
 
-            uint8_t threshold = (((x / 4) + (y / 4)) % 2 == 0) ? 85 : 170;
-            uint8_t new_pixel = (brightness < threshold) ? 0 : 255;
+            uint8_t pixel_threshold = (((x / 4) + (y / 4)) % 2 == 0) ? low_t : high_t;
+            uint8_t new_pixel = (brightness < pixel_threshold) ? 0 : 255;
 
             for (unsigned c = 0; c < 3; c++) {
                 pixel[c] = new_pixel;

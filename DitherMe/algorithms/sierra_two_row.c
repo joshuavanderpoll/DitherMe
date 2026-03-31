@@ -6,7 +6,7 @@
 #include <png.h>
 #include "image_utils.h"
 
-void sierra_two_row_dither(uint8_t *image, unsigned width, unsigned height, unsigned channels) {
+void sierra_two_row_dither(uint8_t *image, unsigned width, unsigned height, unsigned channels, uint8_t threshold) {
     int8_t sierra_two_row_matrix[4][2] = {
         {1, 0},   // Right neighbor
         {-1, 1}, {0, 1}, {1, 1}  // Bottom row neighbors
@@ -19,7 +19,7 @@ void sierra_two_row_dither(uint8_t *image, unsigned width, unsigned height, unsi
             for (unsigned c = 0; c < channels; c++) {
                 uint8_t *pixel = &image[(y * width + x) * channels + c];
                 int old_pixel = *pixel;
-                int new_pixel = old_pixel < 128 ? 0 : 255;
+                int new_pixel = old_pixel < threshold ? 0 : 255;
                 *pixel = new_pixel;
                 int quant_error = old_pixel - new_pixel;
 
@@ -39,18 +39,21 @@ void sierra_two_row_dither(uint8_t *image, unsigned width, unsigned height, unsi
 
 static PyObject *dither_sierra_two_row(PyObject *self, PyObject *args) {
     Py_buffer input_buffer;
-    if (!PyArg_ParseTuple(args, "y*", &input_buffer)) {
+    int threshold_arg = 128;
+    if (!PyArg_ParseTuple(args, "y*i", &input_buffer, &threshold_arg)) {
         return NULL;
     }
+    uint8_t threshold = (uint8_t)(threshold_arg < 0 ? 0 : threshold_arg > 255 ? 255 : threshold_arg);
 
     unsigned width, height;
     uint8_t *image_data = decode_png((uint8_t *)input_buffer.buf, input_buffer.len, &width, &height);
     if (!image_data) {
         PyErr_SetString(PyExc_RuntimeError, "Failed to decode PNG");
+        PyBuffer_Release(&input_buffer);
         return NULL;
     }
 
-    sierra_two_row_dither(image_data, width, height, 4);
+    sierra_two_row_dither(image_data, width, height, 4, threshold);
 
     size_t output_size;
     uint8_t *output_data = encode_png(image_data, width, height, &output_size);
@@ -58,11 +61,13 @@ static PyObject *dither_sierra_two_row(PyObject *self, PyObject *args) {
 
     if (!output_data) {
         PyErr_SetString(PyExc_RuntimeError, "Failed to encode PNG");
+        PyBuffer_Release(&input_buffer);
         return NULL;
     }
 
     PyObject *result = PyBytes_FromStringAndSize((char *)output_data, output_size);
     free(output_data);
+    PyBuffer_Release(&input_buffer);
     return result;
 }
 

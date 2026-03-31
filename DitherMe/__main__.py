@@ -140,7 +140,7 @@ class DitherMe:
         self.sliders = {}
         self.default_values = {
             "scale": 100, "contrast": 1.0, "midtones": 1.0, "highlights": 1.0,
-            "blur": 0, "pixelation": 1, "noise": 0
+            "blur": 0, "pixelation": 1, "noise": 0, "threshold": 128
         }
 
         # Greyscale Checkbox
@@ -166,6 +166,7 @@ class DitherMe:
         self.add_slider("Blur", "blur", 0, 10, 0, self.update_image, 0.1)
         self.add_slider("Pixelation", "pixelation", 1, 20, 1, self.update_image)
         self.add_slider("Noise", "noise", 0, 100, 0, self.update_image)
+        self.add_slider("Threshold", "threshold", 0, 255, 128, self.update_image)
 
         # Foreground and Background color initialization
         self.selected_foreground = "#FFFFFF"  # Default to white
@@ -543,7 +544,8 @@ class DitherMe:
 
         # Apply dithering algorithm
         dither_algorithm = self.algorithms[self.selected_algorithm.get()]
-        dithered_bytes = dither_algorithm.dither(img_bytes)
+        threshold_value = int(self.sliders["threshold"].get_value())
+        dithered_bytes = dither_algorithm.dither(img_bytes, threshold_value)
         dithered_img = Image.open(io.BytesIO(dithered_bytes)).convert("L" if self.is_greyscale.get() else "RGB")
 
         # If greyscale mode is enabled, apply foreground/background colors
@@ -699,20 +701,6 @@ class DitherMe:
         return proc
 
 
-    def create_checkerboard(self, width, height, box_size=10):
-        """ Create a checkerboard pattern as a background. """
-
-        pattern = Image.new("RGB", (width, height), "#BFBFBF")
-
-        draw = ImageDraw.Draw(pattern)
-        for y in range(0, height, box_size * 2):
-            for x in range(0, width, box_size * 2):
-                draw.rectangle([x, y, x + box_size, y + box_size], fill="#E0E0E0")
-                draw.rectangle([x + box_size, y + box_size, x + box_size * 2, y + box_size * 2], fill="#E0E0E0")
-
-        return pattern
-
-
     def play_gif(self):
         """ Play the GIF animation """
 
@@ -823,6 +811,38 @@ class DitherMe:
             self.root.after(frame_duration, self.animate)
 
 
+    def _export_gif_step(self, file_path, frame_index, total_frames):
+        """Process one GIF frame and schedule the next, keeping the UI responsive."""
+        if self.processed_gif_frames[frame_index] is None:
+            self.processed_gif_frames[frame_index] = self.process_frame(self.gif_frames[frame_index])
+
+        self.progress_bar.set_progress((frame_index + 1) / total_frames)
+
+        if frame_index + 1 < total_frames:
+            self.root.after(1, self._export_gif_step, file_path, frame_index + 1, total_frames)
+        else:
+            self._finish_gif_export(file_path)
+
+    def _finish_gif_export(self, file_path):
+        """Save the fully-processed GIF frames to disk."""
+        processed_frames = [f.convert("RGBA") for f in self.processed_gif_frames if f is not None]
+
+        if processed_frames:
+            processed_frames[0].save(
+                file_path,
+                save_all=True,
+                append_images=processed_frames[1:],
+                loop=0,
+                duration=self.gif_durations[:len(processed_frames)],
+                transparency=255,
+                disposal=2,
+            )
+            self.progress_bar.set_progress(0)
+            tk.messagebox.showinfo("Export Successful", "The GIF has been successfully exported.")
+        else:
+            self.progress_bar.set_progress(0)
+            tk.messagebox.showerror("Export Error", "No frames available to export.")
+
     def export_image(self):
         """Export the image or GIF to a file, supporting multiple formats."""
 
@@ -858,32 +878,7 @@ class DitherMe:
                 return
 
             self.progress_bar.set_progress(0)
-
-            for i in range(total_frames):
-                if self.processed_gif_frames[i] is None:
-                    self.processed_gif_frames[i] = self.process_frame(self.gif_frames[i])
-
-                # Update progress bar
-                self.progress_bar.set_progress((i + 1) / total_frames)
-                self.root.update()
-
-            processed_frames = [frame.convert("RGBA") for frame in self.processed_gif_frames if frame is not None]
-
-            if processed_frames:
-                processed_frames[0].save(
-                    file_path,
-                    save_all=True,
-                    append_images=processed_frames[1:],
-                    loop=0,
-                    duration=self.gif_durations[:len(processed_frames)],
-                    transparency=255,
-                    disposal=2,
-                )
-
-                self.progress_bar.set_progress(0)
-                tk.messagebox.showinfo("Export Successful", "The GIF has been successfully exported.")
-            else:
-                tk.messagebox.showerror("Export Error", "No frames available to export.")
+            self._export_gif_step(file_path, 0, total_frames)
 
         else:
             img_to_save = self.processed_image or self.image
