@@ -2,7 +2,6 @@
 # pylint: disable=line-too-long, unused-argument, no-member
 
 import os
-import io
 import sys
 import tkinter as tk
 from tkinter import filedialog, colorchooser
@@ -87,21 +86,10 @@ class DitherMe:
             "Clustered Dot 4x4": clustered_dot_4x4,
             "Lattice-Boltzmann": lattice_boltzmann,
 
-            # Noise-Based Dithering
-            # "Random": ,
-            # "Blue Noise": ,
-            # "Void-and-Cluster": ,
-
-            # # Checkered Dithering
+            # Checkered Dithering
             "Checkered Small": checkered_small,
             "Checkered Medium": checkered_medium,
             "Checkered Large": checkered_large,
-
-            # Artistic Dithering
-            # "Radial Burst": ,
-            # "Vortex": ,
-            # "Diamond": ,
-            # "Spiral": ,
         }
 
         # Sidebar
@@ -140,7 +128,7 @@ class DitherMe:
         self.sliders = {}
         self.default_values = {
             "scale": 100, "contrast": 1.0, "midtones": 1.0, "highlights": 1.0,
-            "blur": 0, "pixelation": 1, "noise": 0
+            "blur": 0, "pixelation": 1, "noise": 0, "threshold": 128
         }
 
         # Greyscale Checkbox
@@ -166,6 +154,7 @@ class DitherMe:
         self.add_slider("Blur", "blur", 0, 10, 0, self.update_image, 0.1)
         self.add_slider("Pixelation", "pixelation", 1, 20, 1, self.update_image)
         self.add_slider("Noise", "noise", 0, 100, 0, self.update_image)
+        self.add_slider("Threshold", "threshold", 0, 255, 128, self.update_image)
 
         # Foreground and Background color initialization
         self.selected_foreground = "#FFFFFF"  # Default to white
@@ -493,15 +482,18 @@ class DitherMe:
     def process_frame(self, img):
         """ Process an image frame """
 
-        # Ensure image is in RGB mode
+        # Extract alpha before any conversion so we can restore it at the end
+        alpha_channel = img.convert("RGBA").split()[3]
+
         img_rgb = img.convert("RGB")
 
         # Get scale factor (percent-based)
         scale_factor = self.sliders["scale"].get_value() / 100.0
 
-        # Resize image
+        # Resize image and alpha together so they stay in sync
         new_size = (max(1, int(img.width * scale_factor)), max(1, int(img.height * scale_factor)))
         img_resized = img_rgb.resize(new_size, Image.LANCZOS)
+        alpha_channel = alpha_channel.resize(new_size, Image.LANCZOS)
 
         # Convert to grayscale if selected
         if self.is_greyscale.get():
@@ -536,19 +528,20 @@ class DitherMe:
         # Apply noise
         img_converted = self.apply_noise(img_converted)
 
-        # Convert image to bytes
-        img_byte_arr = io.BytesIO()
-        img_converted.save(img_byte_arr, format="PNG")
-        img_bytes = img_byte_arr.getvalue()
-
-        # Apply dithering algorithm
+        # Apply dithering algorithm — pass alpha=255 so only RGB channels are dithered
+        r, g, b = img_converted.convert("RGB").split()
+        img_rgba = Image.merge("RGBA", (r, g, b, Image.new("L", (r.width, r.height), 255)))
+        raw_bytes = img_rgba.tobytes()
+        w, h = img_rgba.size
         dither_algorithm = self.algorithms[self.selected_algorithm.get()]
-        dithered_bytes = dither_algorithm.dither(img_bytes)
-        dithered_img = Image.open(io.BytesIO(dithered_bytes)).convert("L" if self.is_greyscale.get() else "RGB")
+        threshold_value = int(self.sliders["threshold"].get_value())
+        dithered_bytes = dither_algorithm.dither(raw_bytes, w, h, threshold_value)
+        dithered_img = Image.frombytes("RGBA", (w, h), dithered_bytes)
 
         # If greyscale mode is enabled, apply foreground/background colors
         if self.is_greyscale.get():
-            np_dithered = np.array(dithered_img)
+            np_dithered = np.array(dithered_img.convert("L"))
+            orig_alpha = np.array(alpha_channel, dtype=np.float32) / 255.0
 
             # Get foreground and background colors
             fg_color = ImageColor.getrgb(self.selected_foreground)
@@ -558,18 +551,19 @@ class DitherMe:
             fg_opacity = self.sliders["foreground_opacity"].get_value() / 255.0
             bg_opacity = self.sliders["background_opacity"].get_value() / 255.0
 
-            # Convert to RGBA
-            np_colored = np.zeros((*np_dithered.shape, 4), dtype=np.uint8)  # 4 channels (RGBA)
+            # Build RGBA output, multiplying slider opacity by original alpha
+            np_colored = np.zeros((*np_dithered.shape, 4), dtype=np.uint8)
+            fg_mask = np_dithered >= 128
+            np_colored[fg_mask, :3] = fg_color
+            np_colored[~fg_mask, :3] = bg_color
+            np_colored[fg_mask, 3] = (orig_alpha[fg_mask] * fg_opacity * 255).astype(np.uint8)
+            np_colored[~fg_mask, 3] = (orig_alpha[~fg_mask] * bg_opacity * 255).astype(np.uint8)
 
-            # Apply colors with opacity blending
-            np_colored[np_dithered < 128] = [*bg_color, int(bg_opacity * 255)]  # Dark pixels -> Background
-            np_colored[np_dithered >= 128] = [*fg_color, int(fg_opacity * 255)]  # Light pixels -> Foreground
-
-            # Convert back to PIL image
             final_image = Image.fromarray(np_colored, mode="RGBA")
         else:
-            # Keep dithered image as is if not in greyscale mode
-            final_image = dithered_img
+            # Restore original alpha — the dithered RGB is correct, alpha from C is discarded
+            r, g, b, _ = dithered_img.split()
+            final_image = Image.merge("RGBA", (r, g, b, alpha_channel))
 
         # Resize to original size for display
         final_image = final_image.resize((self.original_width, self.original_height), Image.NEAREST)
@@ -699,20 +693,6 @@ class DitherMe:
         return proc
 
 
-    def create_checkerboard(self, width, height, box_size=10):
-        """ Create a checkerboard pattern as a background. """
-
-        pattern = Image.new("RGB", (width, height), "#BFBFBF")
-
-        draw = ImageDraw.Draw(pattern)
-        for y in range(0, height, box_size * 2):
-            for x in range(0, width, box_size * 2):
-                draw.rectangle([x, y, x + box_size, y + box_size], fill="#E0E0E0")
-                draw.rectangle([x + box_size, y + box_size, x + box_size * 2, y + box_size * 2], fill="#E0E0E0")
-
-        return pattern
-
-
     def play_gif(self):
         """ Play the GIF animation """
 
@@ -823,6 +803,38 @@ class DitherMe:
             self.root.after(frame_duration, self.animate)
 
 
+    def _export_gif_step(self, file_path, frame_index, total_frames):
+        """Process one GIF frame and schedule the next, keeping the UI responsive."""
+        if self.processed_gif_frames[frame_index] is None:
+            self.processed_gif_frames[frame_index] = self.process_frame(self.gif_frames[frame_index])
+
+        self.progress_bar.set_progress((frame_index + 1) / total_frames)
+
+        if frame_index + 1 < total_frames:
+            self.root.after(1, self._export_gif_step, file_path, frame_index + 1, total_frames)
+        else:
+            self._finish_gif_export(file_path)
+
+    def _finish_gif_export(self, file_path):
+        """Save the fully-processed GIF frames to disk."""
+        processed_frames = [f.convert("RGBA") for f in self.processed_gif_frames if f is not None]
+
+        if processed_frames:
+            processed_frames[0].save(
+                file_path,
+                save_all=True,
+                append_images=processed_frames[1:],
+                loop=0,
+                duration=self.gif_durations[:len(processed_frames)],
+                transparency=255,
+                disposal=2,
+            )
+            self.progress_bar.set_progress(0)
+            tk.messagebox.showinfo("Export Successful", "The GIF has been successfully exported.")
+        else:
+            self.progress_bar.set_progress(0)
+            tk.messagebox.showerror("Export Error", "No frames available to export.")
+
     def export_image(self):
         """Export the image or GIF to a file, supporting multiple formats."""
 
@@ -858,32 +870,7 @@ class DitherMe:
                 return
 
             self.progress_bar.set_progress(0)
-
-            for i in range(total_frames):
-                if self.processed_gif_frames[i] is None:
-                    self.processed_gif_frames[i] = self.process_frame(self.gif_frames[i])
-
-                # Update progress bar
-                self.progress_bar.set_progress((i + 1) / total_frames)
-                self.root.update()
-
-            processed_frames = [frame.convert("RGBA") for frame in self.processed_gif_frames if frame is not None]
-
-            if processed_frames:
-                processed_frames[0].save(
-                    file_path,
-                    save_all=True,
-                    append_images=processed_frames[1:],
-                    loop=0,
-                    duration=self.gif_durations[:len(processed_frames)],
-                    transparency=255,
-                    disposal=2,
-                )
-
-                self.progress_bar.set_progress(0)
-                tk.messagebox.showinfo("Export Successful", "The GIF has been successfully exported.")
-            else:
-                tk.messagebox.showerror("Export Error", "No frames available to export.")
+            self._export_gif_step(file_path, 0, total_frames)
 
         else:
             img_to_save = self.processed_image or self.image

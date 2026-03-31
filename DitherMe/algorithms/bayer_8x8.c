@@ -3,8 +3,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <png.h>
-#include "image_utils.h"
 
 static const uint8_t BAYER_8x8[8][8] = {
     {  0, 32,  8, 40,  2, 34, 10, 42 },
@@ -17,13 +15,15 @@ static const uint8_t BAYER_8x8[8][8] = {
     { 63, 31, 55, 23, 61, 29, 53, 21 }
 };
 
-void ordered_dither_bayer_8x8(uint8_t *image, unsigned width, unsigned height, unsigned channels) {
+void ordered_dither_bayer_8x8(uint8_t *image, unsigned width, unsigned height, unsigned channels, int threshold_bias) {
     for (unsigned y = 0; y < height; y++) {
         for (unsigned x = 0; x < width; x++) {
             for (unsigned c = 0; c < channels; c++) {
                 uint8_t *pixel = &image[(y * width + x) * channels + c];
-                uint8_t threshold = (BAYER_8x8[y % 8][x % 8] * 255) / 64;
-                *pixel = (*pixel > threshold) ? 255 : 0;
+                uint8_t matrix_threshold = (BAYER_8x8[y % 8][x % 8] * 255) / 64;
+                int adjusted = (int)*pixel + threshold_bias;
+                adjusted = adjusted < 0 ? 0 : (adjusted > 255 ? 255 : adjusted);
+                *pixel = ((uint8_t)adjusted > matrix_threshold) ? 255 : 0;
             }
         }
     }
@@ -31,30 +31,27 @@ void ordered_dither_bayer_8x8(uint8_t *image, unsigned width, unsigned height, u
 
 static PyObject *dither_bayer_8x8(PyObject *self, PyObject *args) {
     Py_buffer input_buffer;
-    if (!PyArg_ParseTuple(args, "y*", &input_buffer)) {
+    unsigned int width, height;
+    int threshold_arg = 128;
+    if (!PyArg_ParseTuple(args, "y*IIi", &input_buffer, &width, &height, &threshold_arg)) {
         return NULL;
     }
+    int threshold_bias = threshold_arg - 128;
 
-    unsigned width, height;
-    uint8_t *image_data = decode_png((uint8_t *)input_buffer.buf, input_buffer.len, &width, &height);
+    Py_ssize_t data_len = input_buffer.len;
+    uint8_t *image_data = (uint8_t *)malloc(data_len);
     if (!image_data) {
-        PyErr_SetString(PyExc_RuntimeError, "Failed to decode PNG");
+        PyBuffer_Release(&input_buffer);
+        PyErr_NoMemory();
         return NULL;
     }
+    memcpy(image_data, input_buffer.buf, data_len);
+    PyBuffer_Release(&input_buffer);
 
-    ordered_dither_bayer_8x8(image_data, width, height, 4);
+    ordered_dither_bayer_8x8(image_data, width, height, 4, threshold_bias);
 
-    size_t output_size;
-    uint8_t *output_data = encode_png(image_data, width, height, &output_size);
+    PyObject *result = PyBytes_FromStringAndSize((char *)image_data, data_len);
     free(image_data);
-
-    if (!output_data) {
-        PyErr_SetString(PyExc_RuntimeError, "Failed to encode PNG");
-        return NULL;
-    }
-
-    PyObject *result = PyBytes_FromStringAndSize((char *)output_data, output_size);
-    free(output_data);
     return result;
 }
 

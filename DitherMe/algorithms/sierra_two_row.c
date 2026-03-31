@@ -3,10 +3,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <png.h>
-#include "image_utils.h"
 
-void sierra_two_row_dither(uint8_t *image, unsigned width, unsigned height, unsigned channels) {
+void sierra_two_row_dither(uint8_t *image, unsigned width, unsigned height, unsigned channels, uint8_t threshold) {
     int8_t sierra_two_row_matrix[4][2] = {
         {1, 0},   // Right neighbor
         {-1, 1}, {0, 1}, {1, 1}  // Bottom row neighbors
@@ -19,7 +17,7 @@ void sierra_two_row_dither(uint8_t *image, unsigned width, unsigned height, unsi
             for (unsigned c = 0; c < channels; c++) {
                 uint8_t *pixel = &image[(y * width + x) * channels + c];
                 int old_pixel = *pixel;
-                int new_pixel = old_pixel < 128 ? 0 : 255;
+                int new_pixel = old_pixel < threshold ? 0 : 255;
                 *pixel = new_pixel;
                 int quant_error = old_pixel - new_pixel;
 
@@ -39,30 +37,27 @@ void sierra_two_row_dither(uint8_t *image, unsigned width, unsigned height, unsi
 
 static PyObject *dither_sierra_two_row(PyObject *self, PyObject *args) {
     Py_buffer input_buffer;
-    if (!PyArg_ParseTuple(args, "y*", &input_buffer)) {
+    unsigned int width, height;
+    int threshold_arg = 128;
+    if (!PyArg_ParseTuple(args, "y*IIi", &input_buffer, &width, &height, &threshold_arg)) {
         return NULL;
     }
+    uint8_t threshold = (uint8_t)(threshold_arg < 0 ? 0 : threshold_arg > 255 ? 255 : threshold_arg);
 
-    unsigned width, height;
-    uint8_t *image_data = decode_png((uint8_t *)input_buffer.buf, input_buffer.len, &width, &height);
+    Py_ssize_t data_len = input_buffer.len;
+    uint8_t *image_data = (uint8_t *)malloc(data_len);
     if (!image_data) {
-        PyErr_SetString(PyExc_RuntimeError, "Failed to decode PNG");
+        PyBuffer_Release(&input_buffer);
+        PyErr_NoMemory();
         return NULL;
     }
+    memcpy(image_data, input_buffer.buf, data_len);
+    PyBuffer_Release(&input_buffer);
 
-    sierra_two_row_dither(image_data, width, height, 4);
+    sierra_two_row_dither(image_data, width, height, 4, threshold);
 
-    size_t output_size;
-    uint8_t *output_data = encode_png(image_data, width, height, &output_size);
+    PyObject *result = PyBytes_FromStringAndSize((char *)image_data, data_len);
     free(image_data);
-
-    if (!output_data) {
-        PyErr_SetString(PyExc_RuntimeError, "Failed to encode PNG");
-        return NULL;
-    }
-
-    PyObject *result = PyBytes_FromStringAndSize((char *)output_data, output_size);
-    free(output_data);
     return result;
 }
 
