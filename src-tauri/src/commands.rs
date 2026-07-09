@@ -116,6 +116,15 @@ pub fn process_frame(
     }
 }
 
+#[tauri::command]
+pub fn original_frame(state: State<AppState>, frame_index: usize) -> tauri::ipc::Response {
+    let src = state.0.lock().unwrap();
+    match src.frames.get(frame_index) {
+        Some(f) => tauri::ipc::Response::new(f.rgba.clone()),
+        None => tauri::ipc::Response::new(Vec::new()),
+    }
+}
+
 fn processed_image(frame: &Frame, settings: &Settings) -> RgbaImage {
     let (out, w, h) = process(&frame.rgba, frame.w, frame.h, settings);
     RgbaImage::from_raw(w, h, out).expect("processed buffer size")

@@ -59,7 +59,7 @@ pnpm tauri build    # build an installer
 ## Preview
 
 <p align="center">
-    <img src="assets/github/preview.jpg" alt="Preview">
+    <img src="assets/github/demo.gif" alt="DitherMe demo">
 </p>
 
 ## Dithering algorithms
@@ -79,4 +79,4 @@ Pattern: Checkered Small, Checkered Medium, Checkered Large.
 
 ## Contributing
 
-Fork the repo, make your change on a branch, and open a pull request. For bug reports, include your OS and the output of `rustc --version`, `node --version`, and `pnpm --version`.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, commit conventions, and the pull request checklist. By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). To report a vulnerability, see [SECURITY.md](SECURITY.md).

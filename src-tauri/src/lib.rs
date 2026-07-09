@@ -10,6 +10,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             open_image,
             process_frame,
+            original_frame,
             export_still,
             export_gif,
             save_template,

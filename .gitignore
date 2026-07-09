@@ -12,6 +12,9 @@ target/
 # tauri generated
 src-tauri/gen/schemas/
 
+# source screen recordings (the exported gif in assets is committed)
+*.mov
+
 # env / editor / os
 *.local
 .DS_Store

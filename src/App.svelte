@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import { listen } from "@tauri-apps/api/event";
+  import { getCurrentWebview } from "@tauri-apps/api/webview";
   import Slider from "./lib/Slider.svelte";
   import {
     algorithmList,
@@ -10,6 +11,7 @@
     exportStill,
     loadTemplate,
     openImage,
+    originalFrame,
     processFrame,
     saveTemplate,
     type ImageMeta,
@@ -26,9 +28,15 @@
   let playing = $state(false);
   let progress = $state(0);
   let status = $state("No image loaded");
+  let viewMode = $state<"After" | "Split">("After");
+  let splitRatio = $state(0.5);
+  let dragOver = $state(false);
 
-  let canvasEl: HTMLCanvasElement | undefined;
+  let canvasEl = $state<HTMLCanvasElement>();
+  let origCanvasEl = $state<HTMLCanvasElement>();
+  let stageEl = $state<HTMLDivElement>();
   let dragging = false;
+  let draggingDivider = false;
   let dragLast = { x: 0, y: 0 };
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
   let gifTimer: ReturnType<typeof setTimeout> | undefined;
@@ -49,8 +57,20 @@
         }
       },
     );
+    const unDrop = getCurrentWebview().onDragDropEvent((event) => {
+      if (event.payload.type === "enter" || event.payload.type === "over") {
+        dragOver = true;
+      } else if (event.payload.type === "leave") {
+        dragOver = false;
+      } else if (event.payload.type === "drop") {
+        dragOver = false;
+        const p = event.payload.paths[0];
+        if (p) void openPath(p);
+      }
+    });
     return () => {
       un.then((f) => f());
+      unDrop.then((f) => f());
     };
   });
 
@@ -60,6 +80,13 @@
     const idx = frameIndex;
     if (!meta) return;
     scheduleProcess(snap, idx);
+  });
+
+  // Keep the "before" canvas in sync with the current frame (split view).
+  $effect(() => {
+    const idx = frameIndex;
+    if (!meta) return;
+    void drawOriginal(idx);
   });
 
   function scheduleProcess(snap: Settings, idx: number) {
@@ -77,22 +104,45 @@
     }
   }
 
-  function draw(buf: ArrayBuffer) {
-    if (!meta || !canvasEl) return;
+  function drawTo(canvas: HTMLCanvasElement | undefined, buf: ArrayBuffer) {
+    if (!meta || !canvas) return;
     const { width, height } = meta;
     const need = width * height * 4;
     if (buf.byteLength < need) return;
-    canvasEl.width = width;
-    canvasEl.height = height;
-    const ctx = canvasEl.getContext("2d");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const arr = new Uint8ClampedArray(buf.slice(0, need));
     ctx.putImageData(new ImageData(arr, width, height), 0, 0);
   }
 
+  function draw(buf: ArrayBuffer) {
+    drawTo(canvasEl, buf);
+  }
+
+  async function drawOriginal(idx: number) {
+    try {
+      drawTo(origCanvasEl, await originalFrame(idx));
+    } catch (e) {
+      status = `Error: ${e}`;
+    }
+  }
+
   function resetView() {
     zoom = 1;
     pan = { x: 0, y: 0 };
+  }
+
+  async function openPath(path: string) {
+    try {
+      meta = await openImage(path);
+      frameIndex = 0;
+      resetView();
+      status = `${meta.width}x${meta.height}${meta.is_gif ? ` · ${meta.frame_count} frames` : ""}`;
+    } catch (e) {
+      status = `Error: ${e}`;
+    }
   }
 
   async function load() {
@@ -105,15 +155,7 @@
         },
       ],
     });
-    if (typeof path !== "string") return;
-    try {
-      meta = await openImage(path);
-      frameIndex = 0;
-      resetView();
-      status = `${meta.width}x${meta.height}${meta.is_gif ? ` · ${meta.frame_count} frames` : ""}`;
-    } catch (e) {
-      status = `Error: ${e}`;
-    }
+    if (typeof path === "string") await openPath(path);
   }
 
   async function doExport() {
@@ -187,11 +229,26 @@
     zoom = clamp(zoom * factor, 0.1, 16);
   }
   function onPointerDown(e: PointerEvent) {
+    // In split view, grabbing near the divider drags it instead of panning.
+    if (viewMode === "Split" && stageEl) {
+      const r = stageEl.getBoundingClientRect();
+      const dividerX = r.left + splitRatio * r.width;
+      if (Math.abs(e.clientX - dividerX) <= 14) {
+        draggingDivider = true;
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        return;
+      }
+    }
     dragging = true;
     dragLast = { x: e.clientX, y: e.clientY };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }
   function onPointerMove(e: PointerEvent) {
+    if (draggingDivider && stageEl) {
+      const r = stageEl.getBoundingClientRect();
+      splitRatio = clamp((e.clientX - r.left) / r.width, 0.05, 0.95);
+      return;
+    }
     if (!dragging) return;
     pan = {
       x: pan.x + (e.clientX - dragLast.x),
@@ -201,6 +258,7 @@
   }
   function onPointerUp() {
     dragging = false;
+    draggingDivider = false;
   }
 
   function onKey(e: KeyboardEvent) {
@@ -245,20 +303,51 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="viewport"
+      class:dragover={dragOver}
       onwheel={onWheel}
       onpointerdown={onPointerDown}
       onpointermove={onPointerMove}
       ondblclick={resetView}
     >
+      {#if dragOver}
+        <div class="drophint">Drop file here</div>
+      {/if}
       <div
         class="stage"
-        style="transform: translate({pan.x}px, {pan.y}px) scale({zoom});"
+        bind:this={stageEl}
+        style="width:{meta ? meta.width + 'px' : 'auto'}; height:{meta
+          ? meta.height + 'px'
+          : 'auto'}; transform: translate({pan.x}px, {pan.y}px) scale({zoom});"
       >
-        <canvas bind:this={canvasEl} class:hidden={!meta}></canvas>
-        {#if !meta}
+        {#if meta}
+          <canvas bind:this={origCanvasEl} class="layer"></canvas>
+          <canvas
+            bind:this={canvasEl}
+            class="layer"
+            style={viewMode === "Split"
+              ? `clip-path: inset(0 0 0 ${splitRatio * 100}%);`
+              : ""}
+          ></canvas>
+          {#if viewMode === "Split"}
+            <div class="divider" style="left:{splitRatio * 100}%;"></div>
+          {/if}
+        {:else if !dragOver}
           <div class="empty">Upload an image or GIF</div>
         {/if}
       </div>
+
+      {#if meta}
+        <div class="viewtoggle">
+          <button
+            class:active={viewMode === "After"}
+            onclick={() => (viewMode = "After")}>After</button
+          >
+          <button
+            class:active={viewMode === "Split"}
+            onclick={() => (viewMode = "Split")}>Split</button
+          >
+        </div>
+      {/if}
 
       {#if meta?.is_gif}
         <div class="playbar">
@@ -309,6 +398,7 @@
 
 <style>
   .app {
+    position: relative;
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -375,18 +465,68 @@
     cursor: grabbing;
   }
   .stage {
+    position: relative;
     transform-origin: center center;
     display: flex;
     align-items: center;
     justify-content: center;
   }
-  canvas {
+  .layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     image-rendering: pixelated;
     display: block;
-    max-width: none;
   }
-  canvas.hidden {
-    display: none;
+  .divider {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: 2px;
+    margin-left: -1px;
+    background: #ff2d2d;
+    pointer-events: none;
+  }
+  .divider::before,
+  .divider::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ff2d2d;
+    transform: translateX(-50%);
+  }
+  .divider::before {
+    top: 0;
+  }
+  .divider::after {
+    bottom: 0;
+  }
+  .viewtoggle {
+    position: absolute;
+    left: 14px;
+    bottom: 14px;
+    display: flex;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 8px;
+    overflow: hidden;
+    backdrop-filter: blur(4px);
+  }
+  .viewtoggle button {
+    background: transparent;
+    color: #cfd2d6;
+    border: none;
+    padding: 6px 14px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .viewtoggle button.active {
+    background: var(--accent);
+    color: #fff;
   }
   .empty {
     color: #e8e8e8;
@@ -488,5 +628,22 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .viewport.dragover {
+    outline: 2px dashed var(--accent);
+    outline-offset: -6px;
+  }
+  .drophint {
+    position: absolute;
+    z-index: 5;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 10px 18px;
+    border-radius: 8px;
+    background: rgba(14, 15, 16, 0.82);
+    color: #e8e8e8;
+    font-size: 14px;
+    pointer-events: none;
   }
 </style>

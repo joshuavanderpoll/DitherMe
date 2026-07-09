@@ -50,6 +50,9 @@ export const openImage = (path: string) =>
 export const processFrame = (settings: Settings, frameIndex: number) =>
   invoke<ArrayBuffer>("process_frame", { settings, frameIndex });
 
+export const originalFrame = (frameIndex: number) =>
+  invoke<ArrayBuffer>("original_frame", { frameIndex });
+
 export const exportStill = (
   path: string,
   settings: Settings,
