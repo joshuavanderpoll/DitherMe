@@ -217,91 +217,143 @@
 <svelte:window on:keydown={onKey} on:pointerup={onPointerUp} />
 
 <div class="app">
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="viewport"
-    onwheel={onWheel}
-    onpointerdown={onPointerDown}
-    onpointermove={onPointerMove}
-    ondblclick={resetView}
-  >
-    <div
-      class="stage"
-      style="transform: translate({pan.x}px, {pan.y}px) scale({zoom});"
-    >
-      <canvas bind:this={canvasEl} class:hidden={!meta}></canvas>
-      {#if !meta}
-        <div class="empty">Upload an image or GIF</div>
+  <header class="toolbar">
+    <div class="group">
+      <button class="tbtn strong" onclick={load}>Upload</button>
+      <button class="tbtn" onclick={doExport} disabled={!meta}>Export</button>
+      <button class="tbtn" onclick={reset}>Reset</button>
+    </div>
+    <div class="mid">
+      {#if progress > 0}
+        <div class="progress"><div class="bar" style="width:{progress * 100}%"></div></div>
       {/if}
+      <span class="status">{status}</span>
     </div>
-  </div>
-
-  <aside class="panel">
-    <button class="btn upload" onclick={load}>Upload Image/GIF</button>
-
-    <select bind:value={settings.algorithm} class="select">
-      {#each algorithms as a (a)}
-        <option value={a}>{a}</option>
-      {/each}
-    </select>
-
-    <label class="check">
-      <input type="checkbox" bind:checked={settings.greyscale} /> Greyscale
-    </label>
-
-    <Slider label="Scale (%)" min={1} max={100} bind:value={settings.scale} />
-    <Slider label="Contrast" min={0.5} max={3} step={0.1} bind:value={settings.contrast} />
-    <Slider label="Midtones" min={0.5} max={3} step={0.1} bind:value={settings.midtones} />
-    <Slider label="Highlights" min={0.5} max={3} step={0.1} bind:value={settings.highlights} />
-    <Slider label="Blur" min={0} max={10} step={0.1} bind:value={settings.blur} />
-    <Slider label="Pixelation" min={1} max={20} bind:value={settings.pixelation} />
-    <Slider label="Noise" min={0} max={100} bind:value={settings.noise} />
-    <Slider label="Threshold" min={0} max={255} bind:value={settings.threshold} />
-
-    <label class="color">
-      Foreground
-      <input type="color" bind:value={settings.foreground} />
-    </label>
-    <Slider label="Foreground Opacity" min={0} max={255} bind:value={settings.foreground_opacity} />
-
-    <label class="color">
-      Background
-      <input type="color" bind:value={settings.background} />
-    </label>
-    <Slider label="Background Opacity" min={0} max={255} bind:value={settings.background_opacity} />
-
-    <div class="btnrow">
-      <button class="btn" onclick={doExport} disabled={!meta}>Export</button>
-      <button class="btn" onclick={reset}>Reset</button>
+    <div class="group">
+      <button class="tbtn" onclick={doSaveTemplate}>Save Template</button>
+      <button class="tbtn" onclick={doLoadTemplate}>Load Template</button>
     </div>
-    <div class="btnrow">
-      <button class="btn" onclick={doSaveTemplate}>Save Template</button>
-      <button class="btn" onclick={doLoadTemplate}>Load Template</button>
-    </div>
+  </header>
 
-    {#if meta?.is_gif}
-      <div class="btnrow">
-        {#if playing}
-          <button class="btn" onclick={stopGif}>Stop GIF</button>
-        {:else}
-          <button class="btn" onclick={playGif}>Play GIF</button>
+  <div class="body">
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="viewport"
+      onwheel={onWheel}
+      onpointerdown={onPointerDown}
+      onpointermove={onPointerMove}
+      ondblclick={resetView}
+    >
+      <div
+        class="stage"
+        style="transform: translate({pan.x}px, {pan.y}px) scale({zoom});"
+      >
+        <canvas bind:this={canvasEl} class:hidden={!meta}></canvas>
+        {#if !meta}
+          <div class="empty">Upload an image or GIF</div>
         {/if}
       </div>
-    {/if}
 
-    {#if progress > 0}
-      <div class="progress"><div class="bar" style="width:{progress * 100}%"></div></div>
-    {/if}
-    <div class="status">{status}</div>
-  </aside>
+      {#if meta?.is_gif}
+        <div class="playbar">
+          {#if playing}
+            <button class="tbtn" onclick={stopGif}>Stop</button>
+          {:else}
+            <button class="tbtn" onclick={playGif}>Play</button>
+          {/if}
+          <span class="frames">{frameIndex + 1} / {meta.frame_count}</span>
+        </div>
+      {/if}
+    </div>
+
+    <aside class="panel">
+      <select bind:value={settings.algorithm} class="select">
+        {#each algorithms as a (a)}
+          <option value={a}>{a}</option>
+        {/each}
+      </select>
+
+      <label class="check">
+        <input type="checkbox" bind:checked={settings.greyscale} /> Greyscale
+      </label>
+
+      <Slider label="Scale (%)" min={1} max={100} bind:value={settings.scale} />
+      <Slider label="Contrast" min={0.5} max={3} step={0.1} bind:value={settings.contrast} />
+      <Slider label="Midtones" min={0.5} max={3} step={0.1} bind:value={settings.midtones} />
+      <Slider label="Highlights" min={0.5} max={3} step={0.1} bind:value={settings.highlights} />
+      <Slider label="Blur" min={0} max={10} step={0.1} bind:value={settings.blur} />
+      <Slider label="Pixelation" min={1} max={20} bind:value={settings.pixelation} />
+      <Slider label="Noise" min={0} max={100} bind:value={settings.noise} />
+      <Slider label="Threshold" min={0} max={255} bind:value={settings.threshold} />
+
+      <label class="color">
+        Foreground
+        <input type="color" bind:value={settings.foreground} />
+      </label>
+      <Slider label="Foreground Opacity" min={0} max={255} bind:value={settings.foreground_opacity} />
+
+      <label class="color">
+        Background
+        <input type="color" bind:value={settings.background} />
+      </label>
+      <Slider label="Background Opacity" min={0} max={255} bind:value={settings.background_opacity} />
+    </aside>
+  </div>
 </div>
 
 <style>
   .app {
     display: flex;
+    flex-direction: column;
     height: 100%;
   }
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px;
+    background: var(--container-bg);
+    border-bottom: 1px solid #000;
+  }
+  .group {
+    display: flex;
+    gap: 6px;
+  }
+  .mid {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .tbtn {
+    background: var(--btn);
+    color: var(--text);
+    border: 1px solid #2f323a;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .tbtn:hover:not(:disabled) {
+    background: var(--btn-hover);
+  }
+  .tbtn:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .tbtn.strong {
+    font-weight: 600;
+  }
+  .body {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
   .viewport {
+    position: relative;
     flex: 1;
     overflow: hidden;
     display: flex;
@@ -344,35 +396,22 @@
     flex-direction: column;
     gap: 6px;
   }
-  .btn {
-    display: block;
-    width: 100%;
-    background: var(--btn);
-    color: var(--text);
-    border: 1px solid #2f323a;
-    border-radius: 6px;
-    padding: 9px 10px;
-    cursor: pointer;
-    font-size: 13px;
-  }
-  .btn:hover:not(:disabled) {
-    background: var(--btn-hover);
-  }
-  .btn:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-  .upload {
-    font-weight: 600;
-    margin-bottom: 2px;
-  }
-  .btnrow {
+  .playbar {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
-    gap: 6px;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
   }
-  .btnrow .btn {
-    width: auto;
-    flex: 1;
+  .frames {
+    font-size: 12px;
+    color: #cfd2d6;
   }
   .select {
     width: 100%;
@@ -419,6 +458,8 @@
     background: none;
   }
   .progress {
+    width: 160px;
+    flex: none;
     height: 6px;
     background: var(--track);
     border-radius: 3px;
@@ -429,8 +470,10 @@
     background: var(--accent);
   }
   .status {
-    font-size: 11px;
+    font-size: 12px;
     color: #8a8f96;
-    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 </style>
