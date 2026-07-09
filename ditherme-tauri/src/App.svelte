@@ -17,6 +17,7 @@
   } from "./lib/api";
 
   let settings = $state<Settings>(defaultSettings());
+  let baseline = $state<Settings>(defaultSettings());
   let meta = $state<ImageMeta | null>(null);
   let algorithms = $state<string[]>([]);
   let frameIndex = $state(0);
@@ -148,11 +149,16 @@
       multiple: false,
       filters: [{ name: "Template", extensions: ["json"] }],
     });
-    if (typeof path === "string") settings = await loadTemplate(path);
+    if (typeof path === "string") {
+      const loaded = await loadTemplate(path);
+      settings = loaded;
+      baseline = { ...loaded };
+    }
   }
 
   function reset() {
     settings = defaultSettings();
+    baseline = defaultSettings();
   }
 
   function playGif() {
@@ -277,26 +283,26 @@
         <input type="checkbox" bind:checked={settings.greyscale} disabled={!meta} /> Greyscale
       </label>
 
-      <Slider label="Scale (%)" min={1} max={100} bind:value={settings.scale} disabled={!meta} />
-      <Slider label="Contrast" min={0.5} max={3} step={0.1} bind:value={settings.contrast} disabled={!meta} />
-      <Slider label="Midtones" min={0.5} max={3} step={0.1} bind:value={settings.midtones} disabled={!meta} />
-      <Slider label="Highlights" min={0.5} max={3} step={0.1} bind:value={settings.highlights} disabled={!meta} />
-      <Slider label="Blur" min={0} max={10} step={0.1} bind:value={settings.blur} disabled={!meta} />
-      <Slider label="Pixelation" min={1} max={20} bind:value={settings.pixelation} disabled={!meta} />
-      <Slider label="Noise" min={0} max={100} bind:value={settings.noise} disabled={!meta} />
-      <Slider label="Threshold" min={0} max={255} bind:value={settings.threshold} disabled={!meta} />
+      <Slider label="Scale (%)" min={1} max={100} bind:value={settings.scale} default={baseline.scale} disabled={!meta} />
+      <Slider label="Contrast" min={0.5} max={3} step={0.1} bind:value={settings.contrast} default={baseline.contrast} disabled={!meta} />
+      <Slider label="Midtones" min={0.5} max={3} step={0.1} bind:value={settings.midtones} default={baseline.midtones} disabled={!meta} />
+      <Slider label="Highlights" min={0.5} max={3} step={0.1} bind:value={settings.highlights} default={baseline.highlights} disabled={!meta} />
+      <Slider label="Blur" min={0} max={10} step={0.1} bind:value={settings.blur} default={baseline.blur} disabled={!meta} />
+      <Slider label="Pixelation" min={1} max={20} bind:value={settings.pixelation} default={baseline.pixelation} disabled={!meta} />
+      <Slider label="Noise" min={0} max={100} bind:value={settings.noise} default={baseline.noise} disabled={!meta} />
+      <Slider label="Threshold" min={0} max={255} bind:value={settings.threshold} default={baseline.threshold} disabled={!meta} />
 
       <label class="color">
         Foreground
         <input type="color" bind:value={settings.foreground} disabled={!meta} />
       </label>
-      <Slider label="Foreground Opacity" min={0} max={255} bind:value={settings.foreground_opacity} disabled={!meta} />
+      <Slider label="Foreground Opacity" min={0} max={255} bind:value={settings.foreground_opacity} default={baseline.foreground_opacity} disabled={!meta} />
 
       <label class="color">
         Background
         <input type="color" bind:value={settings.background} disabled={!meta} />
       </label>
-      <Slider label="Background Opacity" min={0} max={255} bind:value={settings.background_opacity} disabled={!meta} />
+      <Slider label="Background Opacity" min={0} max={255} bind:value={settings.background_opacity} default={baseline.background_opacity} disabled={!meta} />
     </aside>
   </div>
 </div>

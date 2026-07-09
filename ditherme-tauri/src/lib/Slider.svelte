@@ -5,6 +5,7 @@
     max: number;
     step?: number;
     value: number;
+    default: number;
     disabled?: boolean;
   }
   let {
@@ -13,6 +14,7 @@
     max,
     step = 1,
     value = $bindable(),
+    default: defaultValue,
     disabled = false,
   }: Props = $props();
 </script>
@@ -27,6 +29,8 @@
       {max}
       {step}
       {disabled}
+      title="Double-click to reset"
+      ondblclick={() => !disabled && (value = defaultValue)}
       bind:value
     />
   </div>
