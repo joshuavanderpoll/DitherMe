@@ -1,0 +1,20 @@
+# dependencies
+node_modules/
+
+# frontend build output
+dist/
+dist-ssr/
+.vite/
+
+# rust / cargo (workspace target, includes src-tauri/target)
+target/
+
+# tauri generated
+src-tauri/gen/schemas/
+
+# env / editor / os
+*.local
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
