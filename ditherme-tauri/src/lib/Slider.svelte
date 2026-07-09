@@ -5,8 +5,16 @@
     max: number;
     step?: number;
     value: number;
+    disabled?: boolean;
   }
-  let { label, min, max, step = 1, value = $bindable() }: Props = $props();
+  let {
+    label,
+    min,
+    max,
+    step = 1,
+    value = $bindable(),
+    disabled = false,
+  }: Props = $props();
 </script>
 
 <div class="slider">
@@ -18,10 +26,11 @@
       {min}
       {max}
       {step}
+      {disabled}
       bind:value
     />
   </div>
-  <input class="range" type="range" {min} {max} {step} bind:value />
+  <input class="range" type="range" {min} {max} {step} {disabled} bind:value />
 </div>
 
 <style>
@@ -50,5 +59,9 @@
   .range {
     width: 100%;
     accent-color: var(--accent);
+  }
+  .num:disabled,
+  .range:disabled {
+    cursor: not-allowed;
   }
 </style>
