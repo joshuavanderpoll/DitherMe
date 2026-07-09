@@ -63,7 +63,7 @@
 
   function scheduleProcess(snap: Settings, idx: number) {
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => void doProcess(snap, idx), 120);
+    debounceTimer = setTimeout(() => void doProcess(snap, idx), 80);
   }
 
   async function doProcess(snap: Settings, idx: number) {
