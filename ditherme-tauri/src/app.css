@@ -1,0 +1,30 @@
+:root {
+  --app-bg: #0e0f10;
+  --container-bg: #161719;
+  --panel-bg: #161719;
+  --accent: #2d8bff;
+  --track: #2a2c33;
+  --btn: #22242a;
+  --btn-hover: #2c2e35;
+  --text: #ffffff;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--app-bg);
+  color: var(--text);
+  font-family: Arial, "Helvetica Neue", sans-serif;
+  overflow: hidden;
+  user-select: none;
+}

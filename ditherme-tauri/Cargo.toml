@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/dither_core"]
+members = ["crates/dither_core", "src-tauri"]
 
 [workspace.package]
 version = "0.1.0"
