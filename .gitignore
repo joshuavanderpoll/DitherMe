@@ -1,13 +1,20 @@
-.venv/
-__pycache__/
+# dependencies
+node_modules/
+
+# frontend build output
 dist/
-build/
-*.spec
+dist-ssr/
+.vite/
+
+# rust / cargo (workspace target, includes src-tauri/target)
+target/
+
+# tauri generated
+src-tauri/gen/schemas/
+
+# env / editor / os
+*.local
 .DS_Store
-assets/icon.iconset/
-.vscode/
-png_lib/
-*.egg-info/
-*.so
-*.pyd
-*.xml
+.idea/
+.vscode/*
+!.vscode/extensions.json
