@@ -51,6 +51,10 @@ def process_frame(img, algorithms, settings):
     dithered_raw = algorithms[settings["algorithm"]].dither(raw, w, h, int(settings["threshold"]))
     dithered = Image.frombytes("RGBA", (w, h), dithered_raw)
 
+    # pixelation/scale rounding can change work size, so realign alpha to the dithered result
+    if alpha.size != dithered.size:
+        alpha = alpha.resize(dithered.size, Image.LANCZOS)
+
     if settings["greyscale"]:
         gray = np.array(dithered.convert("L"))
         orig_alpha = np.array(alpha, dtype=np.float32) / 255.0

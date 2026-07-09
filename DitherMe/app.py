@@ -1,6 +1,7 @@
 # pylint: disable=line-too-long, unused-argument, no-member, missing-module-docstring, missing-class-docstring, missing-function-docstring, broad-exception-caught
 import os
 import sys
+import json
 import queue
 import threading
 import traceback
@@ -174,7 +175,6 @@ class DitherMe:
         self.canvas_image.bind("<ButtonPress-1>", self.on_pan_start)
         self.canvas_image.bind("<B1-Motion>", self.on_pan_move)
         self.canvas_image.bind("<ButtonRelease-1>", self.on_pan_end)
-        self.canvas_image.bind("<MouseWheel>", self.on_mouse_wheel)
         self.canvas_image.bind("<Button-4>", self.on_mouse_wheel_linux)
         self.canvas_image.bind("<Button-5>", self.on_mouse_wheel_linux)
         self.canvas_image.bind("<Double-Button-1>", self.reset_view)
@@ -214,11 +214,19 @@ class DitherMe:
         file_menu.add_command(label=f"Quit DitherMe\t{mod_label}+Q", command=self.root.quit)
         menubar.add_cascade(label="File", menu=file_menu)
 
+        template_menu = tk.Menu(menubar, tearoff=False)
+        template_menu.add_command(label=f"Save Template…\t{mod_label}+S", command=self.save_template)
+        template_menu.add_command(label=f"Load Template…\t{mod_label}+L", command=self.load_template)
+        menubar.add_cascade(label="Templates", menu=template_menu)
+
         self.root.config(menu=menubar)
         self.root.bind_all(f"<{mod_event}-o>", lambda e: self.upload_image())
         self.root.bind_all(f"<{mod_event}-e>", lambda e: self.export_image())
         self.root.bind_all(f"<{mod_event}-r>", lambda e: self.reset_options())
+        self.root.bind_all(f"<{mod_event}-s>", lambda e: self.save_template())
+        self.root.bind_all(f"<{mod_event}-l>", lambda e: self.load_template())
         self.root.bind_all(f"<{mod_event}-q>", lambda e: self.root.quit())
+        self.root.bind_all("<MouseWheel>", self._on_mousewheel_root)
 
     def _add_slider(self, label, key, from_, to, default, resolution=1):
         self.sliders[key] = Slider(
@@ -245,6 +253,65 @@ class DitherMe:
             "foreground_opacity": self.sliders["foreground_opacity"].get_value(),
             "background_opacity": self.sliders["background_opacity"].get_value(),
         }
+
+    def _apply_settings(self, settings):
+        slider_keys = (
+            "scale", "contrast", "midtones", "highlights", "blur",
+            "pixelation", "noise", "threshold",
+            "foreground_opacity", "background_opacity",
+        )
+        for key in slider_keys:
+            if key in settings and key in self.sliders:
+                try:
+                    self.sliders[key].set_value(settings[key])
+                except TypeError:
+                    pass
+
+        if settings.get("algorithm") in self.algorithms:
+            self.selected_algorithm.set(settings["algorithm"])
+        if "greyscale" in settings:
+            self.is_greyscale.set(bool(settings["greyscale"]))
+        if settings.get("foreground"):
+            self.selected_foreground = settings["foreground"]
+            self.foreground_btn.update_preview_color(self.selected_foreground)
+        if settings.get("background"):
+            self.selected_background = settings["background"]
+            self.background_btn.update_preview_color(self.selected_background)
+
+        self.update_image()
+
+    def save_template(self):
+        file_path = filedialog.asksaveasfilename(
+            title="Save Template",
+            defaultextension=".json",
+            filetypes=[("DitherMe Template", "*.json"), ("All files", "*.*")],
+        )
+        if not file_path:
+            return
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(self._get_settings(), f, indent=2)
+            messagebox.showinfo("Template Saved", "Template saved successfully.")
+        except Exception as exc:
+            messagebox.showerror("Save Error", f"Failed to save template:\n{exc}")
+
+    def load_template(self):
+        file_path = filedialog.askopenfilename(
+            title="Load Template",
+            filetypes=[("DitherMe Template", "*.json"), ("All files", "*.*")],
+        )
+        if not file_path or not os.path.exists(file_path):
+            return
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                settings = json.load(f)
+        except Exception as exc:
+            messagebox.showerror("Load Error", f"Failed to load template:\n{exc}")
+            return
+        if not isinstance(settings, dict):
+            messagebox.showerror("Load Error", "Invalid template file.")
+            return
+        self._apply_settings(settings)
 
     # --- Debounce & background processing ---
 
@@ -342,6 +409,8 @@ class DitherMe:
     def _display_cached(self):
         if self._cached_view_image is not None:
             self.display_image(self._cached_view_image)
+        elif self.image is not None or (self.is_gif and self.gif_frames):
+            self._rebuild_view()
 
     def pick_foreground(self):
         color = colorchooser.askcolor(title="Choose Foreground Color")[1]
@@ -569,6 +638,15 @@ class DitherMe:
         self.zoom = new_zoom
         # Reuse the cached view image — zoom only changes display size, not the content
         self._display_cached()
+
+    def _on_mousewheel_root(self, event):
+        # Only zoom when the pointer is actually over the canvas widget.
+        cx = self.canvas_image.winfo_rootx()
+        cy = self.canvas_image.winfo_rooty()
+        cw = self.canvas_image.winfo_width()
+        ch = self.canvas_image.winfo_height()
+        if cx <= event.x_root < cx + cw and cy <= event.y_root < cy + ch:
+            self.on_mouse_wheel(event)
 
     def on_mouse_wheel(self, event):
         self.set_zoom(self.zoom * (1.1 if event.delta > 0 else 1 / 1.1))
