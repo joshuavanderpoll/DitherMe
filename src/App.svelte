@@ -466,6 +466,7 @@
   }
   .stage {
     position: relative;
+    flex: none;
     transform-origin: center center;
     display: flex;
     align-items: center;
