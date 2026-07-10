@@ -1,0 +1,13 @@
+[package]
+name = "dither_core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+image = { workspace = true }
+rand = "0.8"
+
+[dev-dependencies]
+serde_json = { workspace = true }

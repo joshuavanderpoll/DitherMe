@@ -2,145 +2,81 @@
   <img src="assets/github/banner.jpg" height="300px" alt="DitherMe banner">
 </p>
 
-<h1 align="center">DitherMe - Dither your images and GIFs</h1>
+<h1 align="center">DitherMe</h1>
 
 <p align="center">
-    <img src="https://api.visitorbadge.io/api/visitors?path=https%3A%2F%2Fgithub.com%2Fjoshuavanderpoll%2FDitherMe&label=Views&countColor=%2337d67a" />
-    <a href="https://www.python.org/">
-      <img src="https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54" alt="Python">
+    <a href="https://tauri.app/">
+      <img src="https://img.shields.io/badge/Tauri-24C8DB?style=for-the-badge&logo=tauri&logoColor=white" alt="Tauri">
     </a>
-      <a href="https://github.com/joshuavanderpoll/DitherMe/blob/main/LICENSE">
+    <a href="https://www.rust-lang.org/">
+      <img src="https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white" alt="Rust">
+    </a>
+    <a href="https://svelte.dev/">
+      <img src="https://img.shields.io/badge/Svelte-FF3E00?style=for-the-badge&logo=svelte&logoColor=white" alt="Svelte">
+    </a>
+    <a href="https://github.com/joshuavanderpoll/DitherMe/blob/main/LICENSE">
         <img src="https://img.shields.io/badge/license-009dff?style=for-the-badge" alt="license" />
     </a>
     <a href="https://github.com/joshuavanderpoll/DitherMe/releases">
         <img src="https://img.shields.io/badge/Download-32cd32?style=for-the-badge" alt="download" />
     </a>
-    <a href="https://ditherme.joshua-server.nl?utm_source=github&utm_medium=readme&utm_id=ditherme" target="_blank">
-        <img src="https://img.shields.io/badge/Website-red?style=for-the-badge" alt="website" />
-    </a>
 </p>
 
-## 📜 Description 
-DitherMe is a Python-based image effect generator inspired by the iconic glitchy, dithered visuals seen in Watch Dogs 2's DedSec hacking sequences. It allows you to import and process images or GIFs, applying dithering effects with customizable settings, color palettes, pixelation, and noise controls.
+DitherMe applies dithering effects to images and GIFs, the glitchy black-and-white look from Watch Dogs 2's DedSec hacks. It's a desktop app built with Tauri. The image pipeline and all dithering algorithms are written in Rust.
 
-## 🎨 Features:
-- 25+ Dithering algorithms
-- Use custom colors for dithering
-- GIF support – Play & process animated images
-- Pixelation, contrast, blur, and noise filters
-- Interactive sliders for real-time adjustments
+## Features
 
-## 📚 Table of Contents
-- 📜 [Description](#-description)
-- 🎨 [Features](#-features)
-- ⚙️ [How to use](#️-how-to-use)
-- 🖼 [Preview](#-preview)
-- 🧙🏻 [Dithering Algorithms](#dithering-algorithms)
-- 💡 [Contribute](#-contribute)
+- 19 dithering algorithms (error diffusion, ordered, and pattern based)
+- Foreground and background colors with separate opacity
+- GIF playback and export
+- Scale, contrast, midtones, highlights, blur, pixelation, noise, threshold
+- Greyscale toggle, alpha preserved
+- Live preview while dragging sliders (double-click a value to reset it)
+- Zoom, pan, and trackpad pinch
+- Save and load settings as JSON templates
+- Export to PNG, JPEG, WebP, TIFF, BMP, ICO, and GIF
 
-## ⚙️ How to use
+## Download
 
-### Pre-compiled Executables
-For convenience, we provide pre-compiled executables for various platforms. You can download them from the [releases page](https://github.com/joshuavanderpoll/DitherMe/releases).
+Grab a build for your platform from the [releases page](https://github.com/joshuavanderpoll/DitherMe/releases).
 
-#### Windows
-1. Download the `DitherMe.exe` file.
-2. Run the executable by double-clicking it.
+- Windows: run the `.msi` installer.
+- macOS: open the `.dmg` and drag DitherMe to Applications.
 
-#### macOS
-1. Download the `DitherMe.dmg` file.
-2. Open the `.dmg` file and drag the application to your Applications folder.
-3. Run the application from the Applications folder.
+## Build from source
 
-### Running from Source
-If you prefer to run the Python source code, follow the steps below:
+You need Rust, Node.js, pnpm, and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS.
 
-> [!NOTE]
-> To ensure a clean and isolated environment for the project dependencies, it's recommended to use Python's `venv` module.
-
-#### OSX/Linux
 ```bash
-# Install repository
 git clone https://github.com/joshuavanderpoll/DitherMe.git
 cd DitherMe
+pnpm install
 
-# Setup Python environment
-python3 -m venv .venv
-source .venv/bin/activate
-pip3 install -r requirements.txt
-
-# Install PNG Lib
-make clean
-make
-
-# Compile and install all Dithering algorithms
-python setup.py clean --all
-pip install -e .
-
-python3 DitherMe
+pnpm tauri dev      # run in development
+pnpm tauri build    # build an installer
 ```
 
-#### Windows
-```bash
-# Install repository
-git clone https://github.com/joshuavanderpoll/DitherMe.git
-cd DitherMe
+## Preview
 
-# Setup Python environment
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-
-# Install PNG Lib
-make clean
-make
-
-# Compile and install all Dithering algorithms
-python setup.py clean --all
-pip install -e .
-
-python DitherMe
-```
-
-## 🖼 Preview
 <p align="center">
-    <img src="assets/github/preview.jpg" alt="Preview">
+    <img src="assets/github/demo.gif" alt="DitherMe demo">
 </p>
 
-## 🧙🏻 Dithering Algorithms:
-- Error Diffusion Dithering (Error Correction)
-  - Floyd-Steinberg
-  - False Floyd-Steinberg
-  - Sierra
-  - Two-Row Sierra
-  - Sierra Lite
-  - Atkinson
-  - Jarvis, Judice & Ninke
-  - Stucki
-  - Burkes
-  - Lattice-Boltzmann
-  - Stevenson-Arce
-  - Knoll
-- Ordered Dithering
-  - Bayer (2x2)
-  - Bayer 4x4
-  - Bayer 8x8
-  - Clustered Dot 4x4
-- Pattern-Based Dithering
-  - Checkers Small
-  - Checkers Medium
-  - Checkers Large
-  - Radial Burst
-  - Spiral
-  - Vortex
-  - Diamond
-- Stochastic (Noise-Based) Dithering
-  - Random
-  - Blue Noise
-  - Void-and-Cluster
+## Dithering algorithms
 
-## 💡 Contribute
-To contribute, first fork this repository, and `clone` it. Make your changes, whether you're fixing bugs, adding features, or improving translations. When done, `commit` your changes, `push` them, and submit a `pull request` for review to this repostiroy.
+Error diffusion: Floyd-Steinberg, False Floyd-Steinberg, Sierra, Two-Row Sierra, Sierra Lite, Atkinson, Jarvis-Judice & Ninke, Stucki, Burkes, Lattice-Boltzmann, Stevenson-Arce, Knoll.
 
-### Issues
-If you're reporting an issue, make sure to include your `Python version` (python --version), and any relevant information.
+Ordered: Bayer 2x2, Bayer 4x4, Bayer 8x8, Clustered Dot 4x4.
+
+Pattern: Checkered Small, Checkered Medium, Checkered Large.
+
+## Project layout
+
+- `crates/dither_core` - the Rust pipeline and dithering algorithms, no UI. Test with `cargo test -p dither_core`.
+- `src-tauri` - Tauri shell and commands (open, process, export, templates).
+- `src` - Svelte and TypeScript UI.
+- `assets` - icon source and images.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, commit conventions, and the pull request checklist. By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). To report a vulnerability, see [SECURITY.md](SECURITY.md).

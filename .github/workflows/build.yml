@@ -10,144 +10,53 @@ on:
 
 jobs:
   build:
-    name: Build DitherMe
-    runs-on: ${{ matrix.os }}
+    name: Build (${{ matrix.platform }})
+    runs-on: ${{ matrix.platform }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-22.04]
+        include:
+          - platform: macos-latest
+            args: "--target universal-apple-darwin"
+            targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+          - platform: ubuntu-22.04
+            args: ""
+            targets: ""
+          - platform: windows-latest
+            args: ""
+            targets: ""
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Setup Python Environment
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Install System Dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-22.04'
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
         run: |
-          sudo rm -f /etc/apt/sources.list.d/azure-cli* /etc/apt/sources.list.d/microsoft-prod* || true
-          sudo sed -i '/packages\.microsoft\.com/d' /etc/apt/sources.list || true
-
           sudo apt-get update
-          sudo apt-get install -y python3-tk python3-dev libpng-dev build-essential
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - name: Install System Dependencies (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install libpng
-
-      - name: Install System Dependencies (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          git clone https://github.com/microsoft/vcpkg.git
-          cd vcpkg
-          ./bootstrap-vcpkg.bat
-          ./vcpkg.exe install libpng:x64-windows --recurse
-          $env:VCPKG_ROOT = $PWD.Path
-          Write-Output "VCPKG_ROOT=$env:VCPKG_ROOT"
-          Write-Output "VCPKG_ROOT=$env:VCPKG_ROOT" >> $env:GITHUB_ENV
-
-      - name: Install Python Dependencies (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: cmd
-        run: |
-          python -m pip install --upgrade pip setuptools pyinstaller
-          if exist requirements.txt pip install -r requirements.txt
-                
-      - name: Install Python Dependencies (Linux/macOS)
-        if: matrix.os != 'windows-latest'
-        run: |
-          python3 -m pip install --upgrade pip setuptools pyinstaller
-          if [ -f requirements.txt ]; then
-            python3 -m pip install -r requirements.txt
-          fi
-
-      - name: Build PNG Library
-        if: matrix.os != 'windows-latest'
-        run: |
-          make clean
-          make
-
-      - name: Compile and Install Dithering Algorithms
-        run: |
-          python setup.py clean --all
-          pip install -e . --verbose
-
-      - name: Build Application (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          pyinstaller --clean --windowed --onefile --name "DitherMe" --icon="assets/icon.ico" --add-data "$(python3 -c 'import tkinter; print(tkinter.__path__[0])'):tkinter" --add-binary "DitherMe/algorithms/*.pyd;DitherMe/algorithms" --hidden-import=PIL --hidden-import=PIL.Image --hidden-import=DitherMe.algorithms.floydsteinberg --hidden-import=DitherMe.algorithms.sierra --hidden-import=DitherMe.algorithms.false_floydsteinberg --hidden-import=DitherMe.algorithms.sierra_lite --hidden-import=DitherMe.algorithms.sierra_two_row --hidden-import=DitherMe.algorithms.atkinson --hidden-import=DitherMe.algorithms.burkes --hidden-import=DitherMe.algorithms.stucki --hidden-import=DitherMe.algorithms.jarvis_judice_ninke --hidden-import=DitherMe.algorithms.bayer_2x2 --hidden-import=DitherMe.algorithms.bayer_4x4 --hidden-import=DitherMe.algorithms.bayer_8x8 --hidden-import=DitherMe.algorithms.clustered_dot_4x4 --hidden-import=DitherMe.algorithms.checkered_small --hidden-import=DitherMe.algorithms.checkered_medium --hidden-import=DitherMe.algorithms.checkered_large --hidden-import=DitherMe.algorithms.knoll --hidden-import=DitherMe.algorithms.lattice_boltzmann --hidden-import=DitherMe.algorithms.stevenson_arce --additional-hooks-dir=. --noconfirm DitherMe/__main__.py
-          mkdir dist\windows 2>nul || echo Folder exists
-          move dist\DitherMe.exe dist\windows\DitherMe.exe
-
-      - name: Build Application (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          pyinstaller --clean --windowed --name "DitherMe" --icon="assets/icon.icns" --osx-bundle-identifier=nl.joshuavanderpoll.ditherme --add-data "$(python3 -c 'import tkinter; print(tkinter.__path__[0])'):tkinter" --add-binary "DitherMe/algorithms/*.so:DitherMe/algorithms" --hidden-import=PIL --hidden-import=PIL.Image --hidden-import=DitherMe.algorithms.floydsteinberg --hidden-import=DitherMe.algorithms.sierra --hidden-import=DitherMe.algorithms.false_floydsteinberg --hidden-import=DitherMe.algorithms.sierra_lite --hidden-import=DitherMe.algorithms.sierra_two_row --hidden-import=DitherMe.algorithms.atkinson --hidden-import=DitherMe.algorithms.burkes --hidden-import=DitherMe.algorithms.stucki --hidden-import=DitherMe.algorithms.jarvis_judice_ninke --hidden-import=DitherMe.algorithms.bayer_2x2 --hidden-import=DitherMe.algorithms.bayer_4x4 --hidden-import=DitherMe.algorithms.bayer_8x8 --hidden-import=DitherMe.algorithms.clustered_dot_4x4 --hidden-import=DitherMe.algorithms.checkered_small --hidden-import=DitherMe.algorithms.checkered_medium --hidden-import=DitherMe.algorithms.checkered_large --hidden-import=DitherMe.algorithms.knoll --hidden-import=DitherMe.algorithms.lattice_boltzmann --hidden-import=DitherMe.algorithms.stevenson_arce --additional-hooks-dir=. --noconfirm DitherMe/__main__.py
-          mkdir -p dist/macos
-          mv dist/DitherMe.app dist/macos/DitherMe.app
-
-      - name: Build Application (Ubuntu)
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          pyinstaller --clean --onefile --name "DitherMe" --add-data "$(python3 -c 'import tkinter; print(tkinter.__path__[0])'):tkinter" --add-binary "DitherMe/algorithms/*.so:DitherMe/algorithms" --hidden-import=PIL --hidden-import=PIL.Image --hidden-import=DitherMe.algorithms.floydsteinberg --hidden-import=DitherMe.algorithms.sierra --hidden-import=DitherMe.algorithms.false_floydsteinberg --hidden-import=DitherMe.algorithms.sierra_lite --hidden-import=DitherMe.algorithms.sierra_two_row --hidden-import=DitherMe.algorithms.atkinson --hidden-import=DitherMe.algorithms.burkes --hidden-import=DitherMe.algorithms.stucki --hidden-import=DitherMe.algorithms.jarvis_judice_ninke --hidden-import=DitherMe.algorithms.bayer_2x2 --hidden-import=DitherMe.algorithms.bayer_4x4 --hidden-import=DitherMe.algorithms.bayer_8x8 --hidden-import=DitherMe.algorithms.clustered_dot_4x4 --hidden-import=DitherMe.algorithms.checkered_small --hidden-import=DitherMe.algorithms.checkered_medium --hidden-import=DitherMe.algorithms.checkered_large --hidden-import=DitherMe.algorithms.knoll --hidden-import=DitherMe.algorithms.lattice_boltzmann --hidden-import=DitherMe.algorithms.stevenson_arce --additional-hooks-dir=. --noconfirm DitherMe/__main__.py
-          mkdir -p dist/ubuntu
-          mv dist/DitherMe dist/ubuntu/DitherMe
-
-      - name: Prepare DMG Layout (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          mkdir -p dist/dmg_src
-          cp -R "dist/macos/DitherMe.app" "dist/dmg_src/DitherMe.app"
-          ln -s /Applications "dist/dmg_src/Applications"
-
-      - name: Create DMG (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          mkdir -p dist/dmg
-          hdiutil create -volname "DitherMe" -srcfolder dist/dmg_src -ov -format UDZO dist/dmg/DitherMe.dmg
-
-      - name: Upload Artifact (Windows)
-        if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
+      - uses: pnpm/action-setup@v4
         with:
-          name: DitherMe-Windows
-          path: dist/windows/DitherMe.exe
+          version: 10
 
-      - name: Upload DMG Artifact (macOS)
-        if: matrix.os == 'macos-latest'
-        uses: actions/upload-artifact@v4
+      - uses: actions/setup-node@v4
         with:
-          name: DitherMe-OSX
-          path: dist/dmg/DitherMe.dmg
+          node-version: 20
+          cache: pnpm
 
-      - name: Upload Artifact (Ubuntu)
-        if: matrix.os == 'ubuntu-22.04'
-        uses: actions/upload-artifact@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          name: DitherMe-Ubuntu
-          path: dist/ubuntu/DitherMe
+          targets: ${{ matrix.targets }}
 
-  upload:
-    name: Upload Release Assets
-    runs-on: ubuntu-22.04
-    needs: [build]
-    if: github.event_name == 'release'
-    steps:
-      - name: Download All Artifacts
-        uses: actions/download-artifact@v4
+      - uses: swatinem/rust-cache@v2
         with:
-          path: dist
+          workspaces: ". -> target"
 
-      - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/DitherMe-OSX/DitherMe.dmg
-            dist/DitherMe-Windows/DitherMe.exe
-            dist/DitherMe-Ubuntu/DitherMe
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          releaseId: ${{ github.event.release.id }}
+          args: ${{ matrix.args }}
