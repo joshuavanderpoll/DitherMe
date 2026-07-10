@@ -54,6 +54,15 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Set app version from release tag
+        if: github.event_name == 'release'
+        shell: bash
+        run: |
+          V="${{ github.event.release.tag_name }}"
+          V="${V#v}"
+          node -e "const fs=require('fs');const f='src-tauri/tauri.conf.json';const j=JSON.parse(fs.readFileSync(f));j.version='$V';fs.writeFileSync(f,JSON.stringify(j,null,2)+'\n')"
+          echo "app version set to $V"
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

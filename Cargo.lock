@@ -747,7 +747,7 @@ dependencies = [
 
 [[package]]
 name = "dither_core"
-version = "0.1.0"
+version = "2.0.2"
 dependencies = [
  "image",
  "rand 0.8.6",
@@ -757,7 +757,7 @@ dependencies = [
 
 [[package]]
 name = "ditherme"
-version = "0.1.0"
+version = "2.0.2"
 dependencies = [
  "dither_core",
  "image",
