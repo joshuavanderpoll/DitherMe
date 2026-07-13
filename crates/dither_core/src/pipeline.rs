@@ -69,7 +69,7 @@ pub fn process(src_rgba: &[u8], src_w: u32, src_h: u32, s: &Settings) -> (Vec<u8
         px.0 = [src_rgba[i * 4], src_rgba[i * 4 + 1], src_rgba[i * 4 + 2]];
     }
 
-    let scale = s.scale / 100.0;
+    let scale = s.scale.clamp(1.0, 100.0) / 100.0;
     if (scale - 1.0).abs() > 1e-6 {
         let nw = ((orig_w as f32 * scale) as u32).max(1);
         let nh = ((orig_h as f32 * scale) as u32).max(1);

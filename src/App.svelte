@@ -28,6 +28,7 @@
   let playing = $state(false);
   let progress = $state(0);
   let status = $state("No image loaded");
+  let sourceName = $state("dithered");
   let viewMode = $state<"After" | "Split">("After");
   let splitRatio = $state(0.5);
   let dragOver = $state(false);
@@ -74,9 +75,33 @@
     };
   });
 
+  // A cleared number field yields null/NaN; the Rust command expects f32, so
+  // replace any non-finite numeric setting with its default before sending.
+  const NUMERIC_KEYS = [
+    "scale",
+    "contrast",
+    "midtones",
+    "highlights",
+    "blur",
+    "pixelation",
+    "noise",
+    "threshold",
+    "foreground_opacity",
+    "background_opacity",
+  ] as const;
+
+  function currentSettings(): Settings {
+    const s = $state.snapshot(settings) as Settings;
+    const d = defaultSettings();
+    for (const k of NUMERIC_KEYS) {
+      if (!Number.isFinite(s[k])) s[k] = d[k];
+    }
+    return s;
+  }
+
   // Reprocess whenever settings or the current frame change.
   $effect(() => {
-    const snap = $state.snapshot(settings) as Settings;
+    const snap = currentSettings();
     const idx = frameIndex;
     if (!meta) return;
     scheduleProcess(snap, idx);
@@ -137,6 +162,8 @@
   async function openPath(path: string) {
     try {
       meta = await openImage(path);
+      const base = path.replace(/^.*[\\/]/, "").replace(/\.[^.]+$/, "");
+      sourceName = base || "image";
       frameIndex = 0;
       resetView();
       status = `${meta.width}x${meta.height}${meta.is_gif ? ` · ${meta.frame_count} frames` : ""}`;
@@ -161,10 +188,14 @@
   async function doExport() {
     if (!meta) return;
     if (meta.is_gif) {
-      const path = await save({ filters: [{ name: "GIF", extensions: ["gif"] }] });
-      if (path) await exportGif(path, $state.snapshot(settings) as Settings);
+      const path = await save({
+        defaultPath: `${sourceName}_dithered.gif`,
+        filters: [{ name: "GIF", extensions: ["gif"] }],
+      });
+      if (path) await exportGif(path, currentSettings());
     } else {
       const path = await save({
+        defaultPath: `${sourceName}_dithered.png`,
         filters: [
           { name: "PNG", extensions: ["png"] },
           { name: "JPEG", extensions: ["jpeg", "jpg"] },
@@ -175,7 +206,7 @@
         ],
       });
       if (path) {
-        await exportStill(path, $state.snapshot(settings) as Settings, frameIndex);
+        await exportStill(path, currentSettings(), frameIndex);
         status = "Export complete";
       }
     }
@@ -183,7 +214,7 @@
 
   async function doSaveTemplate() {
     const path = await save({ filters: [{ name: "Template", extensions: ["json"] }] });
-    if (path) await saveTemplate(path, $state.snapshot(settings) as Settings);
+    if (path) await saveTemplate(path, currentSettings());
   }
 
   async function doLoadTemplate() {
@@ -264,11 +295,16 @@
   function onKey(e: KeyboardEvent) {
     if (!(e.metaKey || e.ctrlKey)) return;
     const k = e.key.toLowerCase();
+    if (k === "s") {
+      e.preventDefault();
+      if (e.shiftKey) doSaveTemplate();
+      else doExport();
+      return;
+    }
     const map: Record<string, () => void> = {
       o: load,
       e: doExport,
       r: reset,
-      s: doSaveTemplate,
       l: doLoadTemplate,
     };
     if (map[k]) {

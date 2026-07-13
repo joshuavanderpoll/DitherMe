@@ -17,6 +17,16 @@
     default: defaultValue,
     disabled = false,
   }: Props = $props();
+
+  function clampLive() {
+    if (Number.isFinite(value)) {
+      if (value > max) value = max;
+      else if (value < min) value = min;
+    }
+  }
+  function normalize() {
+    value = Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : defaultValue;
+  }
 </script>
 
 <div class="slider">
@@ -31,6 +41,8 @@
       {disabled}
       title="Double-click to reset"
       ondblclick={() => !disabled && (value = defaultValue)}
+      oninput={clampLive}
+      onchange={normalize}
       bind:value
     />
   </div>

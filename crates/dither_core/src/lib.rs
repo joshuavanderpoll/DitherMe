@@ -44,7 +44,7 @@ mod tests {
         let (w, h) = (99u32, 98u32);
         let src = checker(w, h);
         for &pix in &[1u32, 3, 7, 20] {
-            for &scale in &[100.0f32, 50.0, 37.0] {
+            for &scale in &[100.0f32, 50.0, 37.0, 500.0, 1000.0] {
                 for &grey in &[true, false] {
                     let mut s = Settings::default();
                     s.pixelation = pix;
